@@ -1,13 +1,19 @@
-# CS2 饰品价格监控 Web 仪表盘 (cs-monitor)
+# CS2 饰品价格监控 Web 仪表盘 (cs-monitor · fork 定制版)
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![Vue 3](https://img.shields.io/badge/vue-3-4FC08D.svg)](https://vuejs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-一个轻量级、可自托管的 **CS2 饰品价格监控平台**，基于 [SteamDT](https://doc.steamdt.com/) 开放平台 API，支持 **CLI 后台监控** 和 **Web 仪表盘** 双模式。用户可通过浏览器完成所有监控操作：查看价格、管理清单、分析趋势、接收告警，**无需登录，无需修改任何配置文件**。
+> 本仓库 fork 自上游 [`Pgooone/cs-monitor`](https://github.com/Pgooone/cs-monitor)，正在做以下定制：
+> - **多用户认证 + 数据隔离**：用户独立 watchlist / 告警 / 极致追踪 / 个人 SteamDT API Key
+> - **捡漏雷达**：跨平台价差扫描功能（待集成）
+>
+> 上游 `main` 分支仅用于同步上游代码；所有定制改动落在 `feature/bargain-radar`（GitHub 默认分支）。
 
-> 本项目采用 AI Agent 驱动开发，核心开发规范定义在 [`CLAUDE.md`](CLAUDE.md) 中。你可以在此基础上自由改造和扩展。
+一个轻量级、可自托管的 **CS2 饰品价格监控平台**，基于 [SteamDT](https://doc.steamdt.com/) 开放平台 API。Web 仪表盘里完成所有监控操作：查看价格、管理清单、分析趋势、接收告警。
+
+> 开发规范见 [`CLAUDE.md`](CLAUDE.md)。
 
 ---
 
@@ -62,11 +68,10 @@ cs-monitor/
 ├── uv.lock # 锁定的依赖版本（提交到 git）
 ├── .env.example # 环境变量模板
 ├── .gitignore
-├── CLAUDE.md # AI Agent 开发工作流规范
-├── architecture.md # 架构设计文档
-├── PRD.md # 产品需求文档
-├── task.json # 开发任务清单
-├── progress.txt # 开发进度日志
+├── CLAUDE.md # fork 定制开发指南
+├── progress.txt # fork 定制进度日志
+├── scripts/
+│ └── manage_users.py # 用户管理 CLI（多用户改造后新增）
 ├── api/
 │ └── steamdt.py # SteamDT API 封装（重试、延迟、异常处理）
 ├── core/
@@ -265,12 +270,15 @@ watchlist = [
 
 ## 开发规范
 
-本项目由 AI Agent 按 `CLAUDE.md` 中的规范逐步开发完成。如果你想用同样的方式继续迭代：
+详见 [`CLAUDE.md`](CLAUDE.md)：
 
-1. 阅读 `CLAUDE.md` 了解工作流
-2. 查看 `task.json` 了解已完成的任务（共 30 个，全部 `passes: true`）
-3. 在 `task.json` 中按顺序完成下一个 `passes: false` 的任务
-4. 遵循"**一个 task 一个 commit**"的原则
+- 分支策略：`main` 同步上游，`feature/bargain-radar` 为定制主线
+- 包管理：统一走 `uv`，不要回退 pip 与手工 `.venv`
+- 多用户安全：bcrypt 密码哈希 + Fernet 加密用户敏感凭据 + JWT 访问令牌
+- 提交规范：Conventional Commits 风格中文 commit；一个 commit 一个语义单元，代码与文档同时提交
+- 用户管理：`uv run python scripts/manage_users.py --help`
+
+
 
 ---
 

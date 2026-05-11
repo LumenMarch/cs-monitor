@@ -2,6 +2,49 @@
 
 本文件遵循 [Keep a Changelog](https://keepachangelog.com/) 规范，记录所有用户可感知的项目变更。
 
+`[bargain-radar 分支]` 章节记录本仓库（fork 自 `Pgooone/cs-monitor`）在 `feature/bargain-radar` 分支上的定制改动，与上游版本号脱钩。
+
+---
+
+## [bargain-radar 分支] · 进行中
+
+### Added — 第一阶段：uv 迁移 + 多用户认证骨架（2026-05-11，commit 89ee00c）
+
+**工程基础设施**
+- 切换到 uv 管理 Python 依赖（`pyproject.toml` + `uv.lock` 取代 `requirements.txt`）
+- 重写 `init.sh` 与 `Dockerfile` 使用 uv
+
+**多用户认证骨架（schema v2）**
+- `utils/security.py`：bcrypt 密码哈希 + Fernet 对称加密 + JWT 三件套
+- `storage/models.py` 重构：新增 `users` 表；隔离表加 `user_id NOT NULL + ON DELETE CASCADE`；全局市场数据保持共享
+- 启动时检测旧单租户 schema 自动备份 `.db` 到 `data/legacy_<ts>/` 后清空重建
+- 真实 `/api/auth/login | me | change-password | steamdt-key`（取代上游单租户 stub）
+- `/api/users/*` 管理员 CRUD（含最后 admin 保护、不能删自己等防御）
+- `main.py` 启动自动建 admin（按 `ADMIN_INITIAL_PASSWORD`）+ 首登强制改密
+- `scripts/manage_users.py` 离线 CLI 工具
+
+**配置变更（必须更新 .env）**
+- 新增必填项：`MASTER_ENCRYPTION_KEY` / `JWT_SECRET_KEY` / `ADMIN_INITIAL_PASSWORD`
+- 移除：`ADMIN_PASSWORD` / `JWT_SECRET` / `JWT_EXPIRY_HOURS`
+- `STEAMDT_API_KEY` 降级为可选系统级 Key（用户在 Web 端各自配置自己的 Key）
+
+### Removed
+- `archived/` 目录（上游归档的 Agent 开发资料与 WebSocket 旧代码）
+- `docs/` 目录（上游某次 bug 审查记录）
+- GitHub 仓库的 Projects 功能（issues / wiki / discussions / projects 全部关闭）
+
+### Pending
+- 业务 routers（watchlist / extreme_track / alerts / dashboard / kline / prices / archive / settings）的 `user_id` 隔离改造
+- 调度器多用户化（循环每个有 SteamDT Key 的用户）
+- 前端：登录页 / 强制改密页 / 用户中心 / admin 管理后台
+- 捡漏雷达功能集成（跨平台价差扫描）
+
+---
+
+## 上游历史（< fork 时间点）
+
+下面记录 fork 时刻（2026-05-11）从上游继承的版本历史。本仓库不再向这些段追加内容。
+
 ---
 
 ## [3.0.0] — 2026-04-28
