@@ -17,29 +17,33 @@ from api.steamdt import (
 from config import MonitorConfig
 from core.analyzer import PriceAnalyzer
 from storage.database import Database
+from utils.security import hash_password
 
 
 class TestPriceAnalyzer:
-    """测试 PriceAnalyzer."""
+    """测试 PriceAnalyzer（多用户 v2）."""
 
     @pytest.fixture
     def analyzer(self):
-        """创建测试用的 PriceAnalyzer."""
+        """创建测试用的 PriceAnalyzer，绑定到 user_id=1，watchlist 含 AK-47 阈值 5%."""
         config = SteamDTConfig(api_key="test-key")
         client = SteamDTClient(config)
         monitor_config = MonitorConfig(
-            watchlist=[
-                {"name": "AK-47 | Redline (Field-Tested)", "threshold": 5.0},
-            ],
             default_threshold_percent=5.0,
             alert_cooldown_hours=4,
         )
         with tempfile.TemporaryDirectory() as tmpdir:
             db = Database(Path(tmpdir) / "test.db")
-            # 预先插入饰品
+            uid = db.create_user(
+                "test-user", hash_password("xxxxxxxx"), role="user"
+            )
             db.insert_item("AK-47 | Redline (Field-Tested)")
-            analyzer = PriceAnalyzer(client, db, monitor_config)
-            # Mock notifier 避免测试依赖外部通知配置
+            db.insert_watchlist_item(
+                user_id=uid,
+                market_hash_name="AK-47 | Redline (Field-Tested)",
+                threshold_percent=5.0,
+            )
+            analyzer = PriceAnalyzer(client, db, monitor_config, user_id=uid)
             analyzer.notifier = MagicMock()
             analyzer.notifier.send_normal_alert = MagicMock(return_value=True)
             yield analyzer
@@ -47,11 +51,16 @@ class TestPriceAnalyzer:
     @patch("api.steamdt.time.sleep", return_value=None)
     def test_analyze_price_surge(self, mock_sleep, analyzer):
         """测试涨价超过阈值时触发 price_surge 告警."""
+        # mock SteamDT 日K 线：返回 2 个点，倒数第二个 close=100.0 作为前日收盘
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "success": True,
-            "data": {"dataList": [{"avgPrice": 100.0}]},
+            "data": [
+                # [timestamp, open, close, high, low]
+                [1700000000, 99.0, 100.0, 101.0, 98.0],   # 前天
+                [1700086400, 100.0, 101.0, 102.0, 99.0],  # 昨天
+            ],
         }
         analyzer.client._client.request = MagicMock(return_value=mock_response)
 
@@ -67,11 +76,16 @@ class TestPriceAnalyzer:
     @patch("api.steamdt.time.sleep", return_value=None)
     def test_analyze_price_drop(self, mock_sleep, analyzer):
         """测试跌价超过阈值时触发 price_drop 告警."""
+        # mock SteamDT 日K 线：返回 2 个点，倒数第二个 close=100.0 作为前日收盘
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "success": True,
-            "data": {"dataList": [{"avgPrice": 100.0}]},
+            "data": [
+                # [timestamp, open, close, high, low]
+                [1700000000, 99.0, 100.0, 101.0, 98.0],   # 前天
+                [1700086400, 100.0, 101.0, 102.0, 99.0],  # 昨天
+            ],
         }
         analyzer.client._client.request = MagicMock(return_value=mock_response)
 
@@ -87,11 +101,16 @@ class TestPriceAnalyzer:
     @patch("api.steamdt.time.sleep", return_value=None)
     def test_analyze_no_alert_within_threshold(self, mock_sleep, analyzer):
         """测试波动在阈值范围内时不触发告警."""
+        # mock SteamDT 日K 线：返回 2 个点，倒数第二个 close=100.0 作为前日收盘
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "success": True,
-            "data": {"dataList": [{"avgPrice": 100.0}]},
+            "data": [
+                # [timestamp, open, close, high, low]
+                [1700000000, 99.0, 100.0, 101.0, 98.0],   # 前天
+                [1700086400, 100.0, 101.0, 102.0, 99.0],  # 昨天
+            ],
         }
         analyzer.client._client.request = MagicMock(return_value=mock_response)
 
@@ -105,11 +124,16 @@ class TestPriceAnalyzer:
     @patch("api.steamdt.time.sleep", return_value=None)
     def test_analyze_cooldown(self, mock_sleep, analyzer):
         """测试同一方向告警在冷却期内不会重复触发."""
+        # mock SteamDT 日K 线：返回 2 个点，倒数第二个 close=100.0 作为前日收盘
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "success": True,
-            "data": {"dataList": [{"avgPrice": 100.0}]},
+            "data": [
+                # [timestamp, open, close, high, low]
+                [1700000000, 99.0, 100.0, 101.0, 98.0],   # 前天
+                [1700086400, 100.0, 101.0, 102.0, 99.0],  # 昨天
+            ],
         }
         analyzer.client._client.request = MagicMock(return_value=mock_response)
 
@@ -128,7 +152,7 @@ class TestPriceAnalyzer:
     def test_analyze_fallback_to_latest_price(self, analyzer):
         """测试 7 天均价 API 失败时回退到上一次采集价格."""
         # 7天均价 API 抛出 SteamDTError（网络层错误已被 _request 包装）
-        analyzer.client.get_7day_average = MagicMock(
+        analyzer.client.get_item_kline = MagicMock(
             side_effect=SteamDTError("network error")
         )
 
@@ -148,11 +172,16 @@ class TestPriceAnalyzer:
     @patch("api.steamdt.time.sleep", return_value=None)
     def test_baseline_cache_hit(self, mock_sleep, analyzer):
         """测试 6h 缓存命中时不再调用 API."""
+        # mock SteamDT 日K 线：返回 2 个点，倒数第二个 close=100.0 作为前日收盘
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "success": True,
-            "data": {"dataList": [{"avgPrice": 100.0}]},
+            "data": [
+                # [timestamp, open, close, high, low]
+                [1700000000, 99.0, 100.0, 101.0, 98.0],   # 前天
+                [1700086400, 100.0, 101.0, 102.0, 99.0],  # 昨天
+            ],
         }
         analyzer.client._client.request = MagicMock(return_value=mock_response)
 
@@ -170,11 +199,16 @@ class TestPriceAnalyzer:
     @patch("api.steamdt.time.sleep", return_value=None)
     def test_baseline_cache_expired(self, mock_sleep, analyzer):
         """测试缓存过期后重新调用 API."""
+        # mock SteamDT 日K 线：返回 2 个点，倒数第二个 close=100.0 作为前日收盘
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "success": True,
-            "data": {"dataList": [{"avgPrice": 100.0}]},
+            "data": [
+                # [timestamp, open, close, high, low]
+                [1700000000, 99.0, 100.0, 101.0, 98.0],   # 前天
+                [1700086400, 100.0, 101.0, 102.0, 99.0],  # 昨天
+            ],
         }
         analyzer.client._client.request = MagicMock(return_value=mock_response)
 
@@ -182,18 +216,19 @@ class TestPriceAnalyzer:
         analyzer._get_baseline_price(name)
         assert analyzer.client._client.request.call_count == 1
 
-        # 模拟缓存过期（手动将时间戳改到 7 小时前）
-        analyzer._avg_cache[name] = (
-            100.0,
-            datetime.utcnow() - timedelta(hours=7),
-        )
+        # 模拟缓存过期：把缓存日期改为非今天
+        from datetime import UTC, datetime as _dt
+        yesterday_str = (
+            _dt.now(UTC) - timedelta(days=1)
+        ).strftime("%Y-%m-%d")
+        analyzer._baseline_cache[name] = (100.0, yesterday_str)
 
         analyzer._get_baseline_price(name)
         assert analyzer.client._client.request.call_count == 2  # 重新调 API
 
     def test_baseline_rate_limit_fallback_to_db(self, analyzer):
         """测试 SteamDTRateLimitError 时 fallback 到 DB 最新价."""
-        analyzer.client.get_7day_average = MagicMock(
+        analyzer.client.get_item_kline = MagicMock(
             side_effect=SteamDTRateLimitError(retry_after=60.0)
         )
         analyzer.db.insert_price_record(
@@ -205,7 +240,7 @@ class TestPriceAnalyzer:
 
     def test_baseline_business_error_fallback_to_db(self, analyzer):
         """测试 SteamDTBusinessError 时 fallback 到 DB 最新价."""
-        analyzer.client.get_7day_average = MagicMock(
+        analyzer.client.get_item_kline = MagicMock(
             side_effect=SteamDTBusinessError(code=4001, message="参数错误")
         )
         analyzer.db.insert_price_record(
@@ -217,7 +252,7 @@ class TestPriceAnalyzer:
 
     def test_baseline_generic_error_fallback_to_db(self, analyzer):
         """测试 SteamDTError 时 fallback 到 DB 最新价."""
-        analyzer.client.get_7day_average = MagicMock(
+        analyzer.client.get_item_kline = MagicMock(
             side_effect=SteamDTError("network error")
         )
         analyzer.db.insert_price_record(
@@ -228,9 +263,9 @@ class TestPriceAnalyzer:
         assert price == 77.0
 
     def test_baseline_success_false_fallback_to_db(self, analyzer):
-        """测试 API 返回 success=false 时 fallback 到 DB."""
-        analyzer.client.get_7day_average = MagicMock(
-            return_value={"success": False, "errorCode": 4001, "errorMsg": "参数错误"}
+        """测试 K 线数据不足时 fallback 到 DB."""
+        analyzer.client.get_item_kline = MagicMock(
+            return_value={"success": True, "data": []}  # 空数据 → fallback
         )
         analyzer.db.insert_price_record(
             "AK-47 | Redline (Field-Tested)", "BUFF", 66.0

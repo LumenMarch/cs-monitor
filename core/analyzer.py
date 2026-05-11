@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from loguru import logger
@@ -43,7 +43,7 @@ class PriceAnalyzer:
         使用 SteamDT 日K 前一交易日收盘价（每日刷新），
         失败时 fallback 到 DB 最新价.
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         today_str = now.strftime("%Y-%m-%d")
 
         # 当日缓存命中

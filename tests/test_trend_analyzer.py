@@ -4,12 +4,25 @@ from __future__ import annotations
 
 import sqlite3
 import tempfile
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from core.trend_analyzer import TrendAnalyzer
 from storage.database import Database
+
+
+def _recent_dates(count: int) -> list[str]:
+    """生成连续 N 天的"YYYY-MM-DD 12:00:00"日期串，以今天为终点向前推.
+
+    避免硬编码日期导致 days=30 滑动窗口截断 fixture 数据.
+    """
+    today = datetime.now()
+    return [
+        (today - timedelta(days=count - 1 - i)).strftime("%Y-%m-%d 12:00:00")
+        for i in range(count)
+    ]
 
 
 class TestTrendAnalyzer:
@@ -47,7 +60,7 @@ class TestTrendAnalyzer:
         """测试连涨趋势检测."""
         name = "AK-47 | Test (Field-Tested)"
         prices = [100.0, 101.0, 102.0, 103.0, 104.0, 105.0]
-        dates = [f"2026-04-{10+i} 12:00:00" for i in range(len(prices))]
+        dates = _recent_dates(len(prices))
         self._insert_prices(db, name, prices, dates)
 
         result = analyzer.analyze(name, days=30)
@@ -62,7 +75,7 @@ class TestTrendAnalyzer:
         """测试连跌趋势检测."""
         name = "AWP | Test (Field-Tested)"
         prices = [105.0, 104.0, 103.0, 102.0, 101.0, 100.0]
-        dates = [f"2026-04-{10+i} 12:00:00" for i in range(len(prices))]
+        dates = _recent_dates(len(prices))
         self._insert_prices(db, name, prices, dates)
 
         result = analyzer.analyze(name, days=30)
@@ -73,7 +86,7 @@ class TestTrendAnalyzer:
         """测试震荡趋势检测."""
         name = "M4A4 | Test (Field-Tested)"
         prices = [100.0, 102.0, 101.0, 103.0, 102.0, 104.0]
-        dates = [f"2026-04-{10+i} 12:00:00" for i in range(len(prices))]
+        dates = _recent_dates(len(prices))
         self._insert_prices(db, name, prices, dates)
 
         result = analyzer.analyze(name, days=30)
@@ -84,7 +97,7 @@ class TestTrendAnalyzer:
         """测试数据不足时返回 None."""
         name = "Glock | Test (Field-Tested)"
         prices = [100.0, 101.0, 102.0]
-        dates = [f"2026-04-{10+i} 12:00:00" for i in range(len(prices))]
+        dates = _recent_dates(len(prices))
         self._insert_prices(db, name, prices, dates)
 
         result = analyzer.analyze(name, days=30)

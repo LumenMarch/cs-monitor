@@ -8,6 +8,21 @@
 
 ## [bargain-radar 分支] · 进行中
 
+### Added — 第五阶段：测试重写（2026-05-11）
+
+- `tests/test_storage.py` 重写：14 项（含 5 项新增跨用户隔离场景）
+- `tests/test_monitor.py` 改造：4 项，fixture 加 user_id
+- `tests/test_analyzer.py` 改造：11 项，mock 从旧 7day_average 切换到 get_item_kline 日 K，
+  缓存字段从 `_avg_cache` 改为 `_baseline_cache`
+- `tests/test_extreme_tracker.py` 改造：7 项，user_id 注入构造器与 DB 调用
+- `tests/test_web_api.py` 整体重写：49 项，含真实登录流程、用户管理 CRUD、
+  watchlist/alerts/extreme-track 跨用户隔离验证、admin-only 守卫
+- `tests/test_trend_analyzer.py` 修复 fixture 日期硬编码（被 30 天窗口截断的上游 bug）：
+  改用 `_recent_dates()` 相对今天生成
+- `core/analyzer.py` 顺手修复 `datetime.utcnow()` 弃用警告
+
+测试现状：**109 passed, 0 warnings**
+
 ### Changed — 前端包管理切换到 bun（2026-05-11）
 
 - 删除 `frontend/package-lock.json`，改用 `frontend/bun.lock`（文本格式，bun 1.3+ 默认）

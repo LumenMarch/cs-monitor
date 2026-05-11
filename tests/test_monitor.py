@@ -10,29 +10,30 @@ from api.steamdt import SteamDTClient, SteamDTConfig
 from config import MonitorConfig
 from core.monitor import PriceMonitor
 from storage.database import Database
+from utils.security import hash_password
 
 
 class TestPriceMonitor:
-    """测试 PriceMonitor."""
+    """测试 PriceMonitor（多用户 v2）."""
 
     @pytest.fixture
     def monitor(self):
-        """创建测试用的 PriceMonitor."""
+        """创建测试用的 PriceMonitor，绑定到 user_id=1."""
         config = SteamDTConfig(api_key="test-key")
         client = SteamDTClient(config)
-        monitor_config = MonitorConfig(
-            watchlist=[
-                {"name": "AK-47 | Redline (Field-Tested)", "threshold": 5.0},
-            ],
-        )
+        monitor_config = MonitorConfig()
         with tempfile.TemporaryDirectory() as tmpdir:
             db = Database(Path(tmpdir) / "test.db")
+            uid = db.create_user(
+                "test-user", hash_password("xxxxxxxx"), role="user"
+            )
             db.insert_watchlist_item(
+                user_id=uid,
                 market_hash_name="AK-47 | Redline (Field-Tested)",
                 threshold_percent=5.0,
                 enabled=True,
             )
-            yield PriceMonitor(client, db, monitor_config)
+            yield PriceMonitor(client, db, monitor_config, user_id=uid)
 
     @patch("api.steamdt.time.sleep", return_value=None)
     def test_collect_prices_success(self, mock_sleep, monitor):
@@ -71,7 +72,9 @@ class TestPriceMonitor:
     def test_collect_prices_empty_watchlist(self, mock_sleep, monitor):
         """测试空监控清单."""
         with monitor.db._cursor() as cursor:
-            cursor.execute("DELETE FROM watchlist")
+            cursor.execute(
+                "DELETE FROM watchlist WHERE user_id = ?", (monitor.user_id,)
+            )
         result = monitor.collect_prices()
         assert result["records"] == []
         assert result["alerts"] == []

@@ -14,33 +14,25 @@ from api.steamdt import (
 from config import MonitorConfig
 from core.extreme_tracker import ExtremeTracker
 from storage.database import Database
+from utils.security import hash_password
 
 
 class TestExtremeTracker:
-    """测试 ExtremeTracker."""
+    """测试 ExtremeTracker（多用户 v2）."""
 
     @pytest.fixture
     def tracker(self):
-        """创建测试用的 ExtremeTracker."""
+        """创建测试用的 ExtremeTracker，绑定到 user_id=1."""
         config = SteamDTConfig(api_key="test-key")
         client = SteamDTClient(config)
-        monitor_config = MonitorConfig(
-            extreme_track_list=[
-                {
-                    "market_hash_name": "AK-47 | Redline (Field-Tested)",
-                    "platform": "BUFF",
-                    "interval_seconds": 60,
-                    "price_track_enabled": True,
-                    "price_change_mode": "any",
-                    "quantity_track_enabled": True,
-                    "quantity_change_mode": "any",
-                    "alert_cooldown_seconds": 0,
-                },
-            ],
-        )
+        monitor_config = MonitorConfig()
         with tempfile.TemporaryDirectory() as tmpdir:
             db = Database(Path(tmpdir) / "test.db")
+            uid = db.create_user(
+                "test-user", hash_password("xxxxxxxx"), role="user"
+            )
             db.insert_extreme_track_config(
+                user_id=uid,
                 market_hash_name="AK-47 | Redline (Field-Tested)",
                 platform="BUFF",
                 interval_seconds=60,
@@ -50,8 +42,7 @@ class TestExtremeTracker:
                 quantity_change_mode="any",
                 alert_cooldown_seconds=0,
             )
-            tracker = ExtremeTracker(client, db, monitor_config)
-            # Mock notifier 避免测试依赖外部通知配置
+            tracker = ExtremeTracker(client, db, monitor_config, user_id=uid)
             tracker.notifier = MagicMock()
             tracker.notifier.send_extreme_alert = MagicMock(return_value=True)
             yield tracker
@@ -72,9 +63,9 @@ class TestExtremeTracker:
         results = tracker.tick()
         assert len(results) == 0
 
-        # 验证快照已写入
+        # 验证快照已写入（按 user_id 隔离）
         snapshot = tracker.db.get_latest_snapshot(
-            "AK-47 | Redline (Field-Tested)", "BUFF"
+            tracker.user_id, "AK-47 | Redline (Field-Tested)", "BUFF"
         )
         assert snapshot is not None
         assert snapshot["price"] == 125.0
@@ -148,6 +139,7 @@ class TestExtremeTracker:
     def test_tick_cooldown(self, mock_time, mock_sleep, tracker):
         """测试告警冷却期内不重复触发."""
         tracker.db.update_extreme_track_config(
+            tracker.user_id,
             "AK-47 | Redline (Field-Tested)", "BUFF",
             alert_cooldown_seconds=3600,
         )
@@ -199,6 +191,7 @@ class TestExtremeTracker:
     def test_tick_disabled(self, mock_sleep, tracker):
         """测试禁用的追踪项不执行."""
         tracker.db.update_extreme_track_config(
+            tracker.user_id,
             "AK-47 | Redline (Field-Tested)", "BUFF",
             enabled=False,
         )
