@@ -25,6 +25,7 @@ from api.steamdt import (
 )
 from config import MonitorConfig
 from core.analyzer import PriceAnalyzer
+from core.bargain_scanner import BargainScanner
 from core.extreme_tracker import ExtremeTracker
 from core.monitor import PriceMonitor
 from storage.database import Database
@@ -52,6 +53,8 @@ class MonitorScheduler:
         self.tz = ZoneInfo(config.timezone)
         self.scheduler = BackgroundScheduler(timezone=config.timezone)
         self._last_synced_at: datetime | None = None
+        # 捡漏雷达：记录每个用户上次扫描时间，按各自 interval_minutes 自调度
+        self._bargain_last_scan: dict[int, datetime] = {}
 
     # ------------------------------------------------------------------
     # SteamDT client 工厂
@@ -140,6 +143,40 @@ class MonitorScheduler:
                 client.close()
 
     # ------------------------------------------------------------------
+    # Job: 捡漏雷达（多用户循环，基于本地 price_records）
+    # ------------------------------------------------------------------
+    def _run_bargain_scanner(self) -> None:
+        """对所有启用了捡漏雷达的用户跑一遍扫描.
+
+        每用户按各自 interval_minutes 节流；调度器 tick 频率为 1 分钟，
+        到点的用户才真正执行 scan.
+        """
+        active_users = self.db.list_users_with_bargain_enabled()
+        if not active_users:
+            return
+
+        now = datetime.now(self.tz)
+        active_ids = {u["user_id"] for u in active_users}
+        # 清理已禁用用户的缓存条目
+        for cached in list(self._bargain_last_scan.keys()):
+            if cached not in active_ids:
+                self._bargain_last_scan.pop(cached, None)
+
+        for user in active_users:
+            uid = int(user["user_id"])
+            interval = max(1, int(user.get("interval_minutes") or 5))
+            last = self._bargain_last_scan.get(uid)
+            if last is not None and (now - last).total_seconds() < interval * 60:
+                continue
+            try:
+                scanner = BargainScanner(self.db, self.config, uid)
+                scanner.scan()
+            except Exception:
+                logger.exception(f"[scheduler] 用户 id={uid} 捡漏扫描异常")
+            finally:
+                self._bargain_last_scan[uid] = now
+
+    # ------------------------------------------------------------------
     # Job: 价格归档（系统级，与 user_id 无关）
     # ------------------------------------------------------------------
     def _run_archive(self) -> None:
@@ -223,6 +260,16 @@ class MonitorScheduler:
         )
         logger.info("极致追踪任务已注册，tick 间隔: 10 秒")
 
+    def _add_bargain_scanner_job(self) -> None:
+        self.scheduler.add_job(
+            self._run_bargain_scanner,
+            trigger=IntervalTrigger(minutes=1),
+            id="bargain_scanner",
+            name="捡漏雷达扫描（多用户循环）",
+            replace_existing=True,
+        )
+        logger.info("捡漏雷达任务已注册，tick 间隔: 60 秒（每用户按各自 interval_minutes 节流）")
+
     def _add_archive_job(self) -> None:
         self.scheduler.add_job(
             self._run_archive,
@@ -251,6 +298,7 @@ class MonitorScheduler:
     def start(self) -> None:
         self._add_monitor_job()
         self._add_extreme_tracker_job()
+        self._add_bargain_scanner_job()
         self._add_archive_job()
         self._add_item_sync_job()
         self.scheduler.start()

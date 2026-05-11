@@ -18,6 +18,7 @@ from web.routers import (
     alerts,
     archive,
     auth,
+    bargain,
     dashboard,
     extreme_track,
     kline,
@@ -75,6 +76,7 @@ def create_app(db: Database, config: MonitorConfig) -> FastAPI:
     app.include_router(alerts.router, prefix="/api")
     app.include_router(prices.router, prefix="/api")
     app.include_router(extreme_track.router, prefix="/api")
+    app.include_router(bargain.router, prefix="/api")
     app.include_router(settings.router, prefix="/api")
     app.include_router(kline.router, prefix="/api")
     app.include_router(kline.arbitrage_router, prefix="/api")

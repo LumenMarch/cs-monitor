@@ -46,8 +46,10 @@ class TestDatabase:
             assert required in tables, f"缺表 {required}"
 
     def test_schema_version_marker(self, db):
-        """初始化后应写入 schema_version=2."""
-        assert db.get_system_config("schema_version") == "2"
+        """初始化后应写入最新 schema_version."""
+        from storage.models import SCHEMA_VERSION
+
+        assert db.get_system_config("schema_version") == str(SCHEMA_VERSION)
 
     def test_insert_and_get_item(self, db):
         """items 是全局表，无 user_id."""

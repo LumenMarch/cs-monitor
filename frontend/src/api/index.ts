@@ -391,6 +391,64 @@ export interface ResetPasswordPayload {
   must_change_password: boolean
 }
 
+// ============================================================
+// 捡漏雷达
+// ============================================================
+export interface BargainScanConfig {
+  enabled: number
+  min_profit_percent: number
+  min_profit_amount: number
+  min_buy_price: number
+  max_buy_price: number
+  buy_platforms: string[]
+  sell_platforms: string[]
+  interval_minutes: number
+  alert_cooldown_minutes: number
+  notify_enabled: number
+  updated_at: string | null
+}
+
+export interface UpdateBargainConfigPayload {
+  enabled?: boolean
+  min_profit_percent?: number
+  min_profit_amount?: number
+  min_buy_price?: number
+  max_buy_price?: number
+  buy_platforms?: string[]
+  sell_platforms?: string[]
+  interval_minutes?: number
+  alert_cooldown_minutes?: number
+  notify_enabled?: boolean
+}
+
+export interface BargainOpportunity {
+  id: number
+  market_hash_name: string
+  display_name: string | null
+  icon_url: string | null
+  buy_platform: string
+  sell_platform: string
+  buy_price: number
+  sell_price: number
+  profit_amount: number
+  profit_percent: number
+  scanned_at: string
+  notified: number
+  dismissed: number
+}
+
+export interface BargainOpportunityListResponse {
+  items: BargainOpportunity[]
+  total: number
+  page: number
+  limit: number
+}
+
+export interface BargainScanResult {
+  scanned: number
+  total_active: number
+}
+
 export interface SearchItemResult {
   market_hash_name: string
   name: string | null
@@ -519,6 +577,36 @@ export default {
   },
   arbitrage() {
     return api.get<ArbitrageItem[]>('/arbitrage')
+  },
+
+  // ─── 捡漏雷达 ─────────────────────────────────────────
+  getBargainConfig() {
+    return api.get<BargainScanConfig>('/bargain/config')
+  },
+  updateBargainConfig(payload: UpdateBargainConfigPayload) {
+    return api.put<BargainScanConfig>('/bargain/config', payload)
+  },
+  listBargainOpportunities(params?: {
+    page?: number
+    limit?: number
+    include_dismissed?: boolean
+    buy_platform?: string
+    sell_platform?: string
+    min_profit_percent?: number
+    market_hash_name?: string
+  }) {
+    return api.get<BargainOpportunityListResponse>('/bargain/opportunities', { params })
+  },
+  dismissBargainOpportunity(id: number) {
+    return api.delete(`/bargain/opportunities/${id}`)
+  },
+  clearBargainOpportunities(only_dismissed = true) {
+    return api.post<{ deleted: number }>('/bargain/opportunities/clear', null, {
+      params: { only_dismissed },
+    })
+  },
+  runBargainScan() {
+    return api.post<BargainScanResult>('/bargain/scan')
   },
   arbitrageItem(marketHashName: string) {
     return api.get<ArbitrageItem>(`/arbitrage/${encodeURIComponent(marketHashName)}`)

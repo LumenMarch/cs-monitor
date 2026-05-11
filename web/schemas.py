@@ -382,6 +382,75 @@ class DailyPricePoint(BaseModel):
     price: float
 
 
+class BargainScanConfig(BaseModel):
+    """捡漏雷达扫描配置（每用户单条）."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    enabled: int = 0
+    min_profit_percent: float = 5.0
+    min_profit_amount: float = 0.0
+    min_buy_price: float = 0.0
+    max_buy_price: float = 0.0
+    buy_platforms: list[str] = Field(default_factory=list, description="买入平台白名单，空表示不过滤")
+    sell_platforms: list[str] = Field(default_factory=list, description="卖出平台白名单，空表示不过滤")
+    interval_minutes: int = 5
+    alert_cooldown_minutes: int = 60
+    notify_enabled: int = 1
+    updated_at: datetime | None = None
+
+
+class BargainScanConfigUpdate(BaseModel):
+    """更新捡漏雷达扫描配置."""
+
+    enabled: bool | None = None
+    min_profit_percent: float | None = Field(None, ge=0.0)
+    min_profit_amount: float | None = Field(None, ge=0.0)
+    min_buy_price: float | None = Field(None, ge=0.0)
+    max_buy_price: float | None = Field(None, ge=0.0)
+    buy_platforms: list[str] | None = None
+    sell_platforms: list[str] | None = None
+    interval_minutes: int | None = Field(None, ge=1, le=1440)
+    alert_cooldown_minutes: int | None = Field(None, ge=0, le=10080)
+    notify_enabled: bool | None = None
+
+
+class BargainOpportunity(BaseModel):
+    """捡漏雷达机会记录."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    market_hash_name: str
+    display_name: str | None = None
+    icon_url: str | None = None
+    buy_platform: str
+    sell_platform: str
+    buy_price: float
+    sell_price: float
+    profit_amount: float
+    profit_percent: float
+    scanned_at: datetime
+    notified: int = 0
+    dismissed: int = 0
+
+
+class BargainOpportunityListResponse(BaseModel):
+    """机会列表分页响应."""
+
+    items: list[BargainOpportunity]
+    total: int
+    page: int
+    limit: int
+
+
+class BargainScanResult(BaseModel):
+    """手动扫描的即时返回."""
+
+    scanned: int = Field(..., description="本轮新增机会数")
+    total_active: int = Field(..., description="未忽略机会总数")
+
+
 class TrendAnalysisResponse(BaseModel):
     """趋势分析响应."""
 

@@ -235,10 +235,60 @@ CREATE INDEX IF NOT EXISTS idx_extreme_alerts_user
 """
 
 
+# 捡漏雷达：扫描配置（每用户单条）
+CREATE_BARGAIN_SCAN_CONFIG_TABLE = """
+CREATE TABLE IF NOT EXISTS bargain_scan_config (
+    user_id INTEGER PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 0,
+    min_profit_percent REAL NOT NULL DEFAULT 5.0,
+    min_profit_amount REAL NOT NULL DEFAULT 0.0,
+    min_buy_price REAL NOT NULL DEFAULT 0.0,
+    max_buy_price REAL NOT NULL DEFAULT 0.0,
+    buy_platforms TEXT,
+    sell_platforms TEXT,
+    interval_minutes INTEGER NOT NULL DEFAULT 5,
+    alert_cooldown_minutes INTEGER NOT NULL DEFAULT 60,
+    notify_enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+"""
+
+# 捡漏雷达：扫描出的跨平台价差机会（每用户独立）
+CREATE_BARGAIN_OPPORTUNITIES_TABLE = """
+CREATE TABLE IF NOT EXISTS bargain_opportunities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    market_hash_name TEXT NOT NULL,
+    buy_platform TEXT NOT NULL,
+    sell_platform TEXT NOT NULL,
+    buy_price REAL NOT NULL,
+    sell_price REAL NOT NULL,
+    profit_amount REAL NOT NULL,
+    profit_percent REAL NOT NULL,
+    scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    notified INTEGER NOT NULL DEFAULT 0,
+    dismissed INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+"""
+
+CREATE_IDX_BARGAIN_OPP_USER_SCAN = """
+CREATE INDEX IF NOT EXISTS idx_bargain_opp_user_scan
+    ON bargain_opportunities(user_id, scanned_at DESC);
+"""
+
+CREATE_IDX_BARGAIN_OPP_USER_ITEM = """
+CREATE INDEX IF NOT EXISTS idx_bargain_opp_user_item
+    ON bargain_opportunities(user_id, market_hash_name, buy_platform, sell_platform, scanned_at DESC);
+"""
+
+
 # =============================================================================
 # 当前 schema 版本（用于"清空重建"判定）
 # =============================================================================
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 ALL_TABLES = [
     # 用户表先于其他表创建（FK 依赖）
@@ -264,4 +314,9 @@ ALL_TABLES = [
     CREATE_IDX_SNAPSHOT_USER_ITEM_TIME,
     CREATE_EXTREME_TRACK_ALERTS_TABLE,
     CREATE_IDX_EXTREME_ALERTS_USER,
+    # 捡漏雷达
+    CREATE_BARGAIN_SCAN_CONFIG_TABLE,
+    CREATE_BARGAIN_OPPORTUNITIES_TABLE,
+    CREATE_IDX_BARGAIN_OPP_USER_SCAN,
+    CREATE_IDX_BARGAIN_OPP_USER_ITEM,
 ]

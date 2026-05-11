@@ -74,6 +74,31 @@ class NotificationManager:
 
         return self.channel.send_with_retry(title, content)
 
+    def send_bargain_alert(self, alert: dict[str, Any]) -> bool:
+        """发送捡漏雷达跨平台价差告警."""
+        if not self.channel:
+            return False
+
+        market_hash_name = alert["market_hash_name"]
+        display_name = alert.get("display_name") or market_hash_name
+        buy_platform = alert["buy_platform"]
+        sell_platform = alert["sell_platform"]
+        buy_price = float(alert["buy_price"])
+        sell_price = float(alert["sell_price"])
+        profit_amount = float(alert["profit_amount"])
+        profit_percent = float(alert["profit_percent"])
+
+        title = "💎 捡漏雷达 · 跨平台价差机会"
+        content = (
+            f"📦 饰品：{display_name}\n"
+            f"🟢 买入：{buy_platform} ¥{buy_price:.2f}\n"
+            f"🔴 卖出：{sell_platform} ¥{sell_price:.2f}\n"
+            f"💰 价差：¥{profit_amount:+.2f}（{profit_percent:+.2f}%）\n"
+            f"🕐 时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+            f"💡 仅供参考，实际套利请扣除平台手续费与提现成本"
+        )
+        return self.channel.send_with_retry(title, content)
+
     def send_extreme_alert(
         self,
         alert: dict[str, Any],

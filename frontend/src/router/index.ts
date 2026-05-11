@@ -50,6 +50,11 @@ const router = createRouter({
           component: () => import('@/views/ExtremeTrack.vue'),
         },
         {
+          path: 'bargain',
+          name: 'Bargain',
+          component: () => import('@/views/Bargain.vue'),
+        },
+        {
           path: 'alerts',
           name: 'Alerts',
           component: () => import('@/views/Alerts.vue'),

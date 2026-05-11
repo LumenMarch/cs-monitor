@@ -84,6 +84,9 @@ class Database:
           - 存在 extreme_track_config 表但缺 user_id 列
 
         全新部署（无 .db 文件）会跳过这一步.
+
+        其他向后兼容的 schema 升级（如 v2→v3 新增 bargain 表）走 _init_tables
+        的 CREATE TABLE IF NOT EXISTS，不需要在这里清库.
         """
         if not self.db_path.exists():
             return  # 全新部署
@@ -1617,6 +1620,256 @@ class Database:
                     """,
                     (baseline_price, change_percent, alert_id),
                 )
+
+    # ------------------------------------------------------------------
+    # bargain_scan_config 表操作（捡漏雷达）
+    # ------------------------------------------------------------------
+    DEFAULT_BARGAIN_CONFIG: dict[str, Any] = {
+        "enabled": 0,
+        "min_profit_percent": 5.0,
+        "min_profit_amount": 0.0,
+        "min_buy_price": 0.0,
+        "max_buy_price": 0.0,
+        "buy_platforms": None,
+        "sell_platforms": None,
+        "interval_minutes": 5,
+        "alert_cooldown_minutes": 60,
+        "notify_enabled": 1,
+    }
+
+    def get_bargain_config(self, user_id: int) -> dict[str, Any]:
+        """获取指定用户的捡漏雷达配置；不存在则返回默认结构（不写库）."""
+        with self._cursor() as cursor:
+            cursor.execute(
+                "SELECT * FROM bargain_scan_config WHERE user_id = ?",
+                (user_id,),
+            )
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+        return {"user_id": user_id, **self.DEFAULT_BARGAIN_CONFIG}
+
+    def upsert_bargain_config(self, user_id: int, **fields: Any) -> dict[str, Any]:
+        """插入或更新指定用户的捡漏雷达配置. 返回最新配置."""
+        allowed = set(self.DEFAULT_BARGAIN_CONFIG.keys())
+        merged = {**self.DEFAULT_BARGAIN_CONFIG}
+        existing = self.get_bargain_config(user_id)
+        for k in allowed:
+            if k in existing:
+                merged[k] = existing[k]
+        for k, v in fields.items():
+            if k not in allowed:
+                continue
+            if isinstance(v, bool):
+                v = 1 if v else 0
+            merged[k] = v
+
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO bargain_scan_config
+                (user_id, enabled, min_profit_percent, min_profit_amount,
+                 min_buy_price, max_buy_price, buy_platforms, sell_platforms,
+                 interval_minutes, alert_cooldown_minutes, notify_enabled,
+                 updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT(user_id) DO UPDATE SET
+                    enabled = excluded.enabled,
+                    min_profit_percent = excluded.min_profit_percent,
+                    min_profit_amount = excluded.min_profit_amount,
+                    min_buy_price = excluded.min_buy_price,
+                    max_buy_price = excluded.max_buy_price,
+                    buy_platforms = excluded.buy_platforms,
+                    sell_platforms = excluded.sell_platforms,
+                    interval_minutes = excluded.interval_minutes,
+                    alert_cooldown_minutes = excluded.alert_cooldown_minutes,
+                    notify_enabled = excluded.notify_enabled,
+                    updated_at = datetime('now')
+                """,
+                (
+                    user_id,
+                    int(merged["enabled"]),
+                    float(merged["min_profit_percent"]),
+                    float(merged["min_profit_amount"]),
+                    float(merged["min_buy_price"]),
+                    float(merged["max_buy_price"]),
+                    merged["buy_platforms"],
+                    merged["sell_platforms"],
+                    int(merged["interval_minutes"]),
+                    int(merged["alert_cooldown_minutes"]),
+                    int(merged["notify_enabled"]),
+                ),
+            )
+        return self.get_bargain_config(user_id)
+
+    def list_users_with_bargain_enabled(self) -> list[dict[str, Any]]:
+        """返回已启用捡漏雷达的活跃用户（含配置内联）.
+
+        调度器循环用. 不要求用户配置了 SteamDT Key（扫描走本地 price_records）.
+        """
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT u.id AS user_id, u.username,
+                       b.enabled, b.min_profit_percent, b.min_profit_amount,
+                       b.min_buy_price, b.max_buy_price,
+                       b.buy_platforms, b.sell_platforms,
+                       b.interval_minutes, b.alert_cooldown_minutes, b.notify_enabled
+                FROM users u
+                INNER JOIN bargain_scan_config b ON b.user_id = u.id
+                WHERE u.is_active = 1 AND b.enabled = 1
+                ORDER BY u.id ASC
+                """
+            )
+            return [dict(r) for r in cursor.fetchall()]
+
+    # ------------------------------------------------------------------
+    # bargain_opportunities 表操作
+    # ------------------------------------------------------------------
+    def has_recent_bargain_opportunity(
+        self,
+        user_id: int,
+        market_hash_name: str,
+        buy_platform: str,
+        sell_platform: str,
+        cooldown_minutes: int,
+    ) -> bool:
+        """检查在冷却期内是否已存在同饰品+同买卖平台组合的机会记录."""
+        if cooldown_minutes <= 0:
+            return False
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT 1 FROM bargain_opportunities
+                WHERE user_id = ? AND market_hash_name = ?
+                  AND buy_platform = ? AND sell_platform = ?
+                  AND scanned_at >= datetime('now', ?)
+                LIMIT 1
+                """,
+                (
+                    user_id,
+                    market_hash_name,
+                    buy_platform,
+                    sell_platform,
+                    f"-{cooldown_minutes} minutes",
+                ),
+            )
+            return cursor.fetchone() is not None
+
+    def insert_bargain_opportunity(
+        self,
+        user_id: int,
+        market_hash_name: str,
+        buy_platform: str,
+        sell_platform: str,
+        buy_price: float,
+        sell_price: float,
+        profit_amount: float,
+        profit_percent: float,
+        notified: bool = False,
+    ) -> int:
+        """插入捡漏机会记录，返回新行 id."""
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO bargain_opportunities
+                (user_id, market_hash_name, buy_platform, sell_platform,
+                 buy_price, sell_price, profit_amount, profit_percent, notified)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user_id,
+                    market_hash_name,
+                    buy_platform,
+                    sell_platform,
+                    buy_price,
+                    sell_price,
+                    profit_amount,
+                    profit_percent,
+                    1 if notified else 0,
+                ),
+            )
+            new_id = cursor.lastrowid
+            assert new_id is not None
+            return new_id
+
+    def get_bargain_opportunities(
+        self,
+        user_id: int,
+        page: int = 1,
+        limit: int = 20,
+        include_dismissed: bool = False,
+        buy_platform: str | None = None,
+        sell_platform: str | None = None,
+        min_profit_percent: float | None = None,
+        market_hash_name: str | None = None,
+    ) -> tuple[list[dict[str, Any]], int]:
+        """分页查询指定用户的机会列表."""
+        conditions = ["bo.user_id = ?"]
+        params: list[Any] = [user_id]
+        if not include_dismissed:
+            conditions.append("bo.dismissed = 0")
+        if buy_platform:
+            conditions.append("bo.buy_platform = ?")
+            params.append(buy_platform)
+        if sell_platform:
+            conditions.append("bo.sell_platform = ?")
+            params.append(sell_platform)
+        if min_profit_percent is not None:
+            conditions.append("bo.profit_percent >= ?")
+            params.append(min_profit_percent)
+        if market_hash_name:
+            conditions.append("bo.market_hash_name LIKE ?")
+            params.append(f"%{market_hash_name}%")
+
+        where_clause = " AND ".join(conditions)
+        with self._cursor() as cursor:
+            cursor.execute(
+                f"SELECT COUNT(*) FROM bargain_opportunities bo WHERE {where_clause}",
+                tuple(params),
+            )
+            total = cursor.fetchone()[0]
+
+            offset = (page - 1) * limit
+            cursor.execute(
+                f"""
+                SELECT bo.*,
+                       COALESCE(i.name, i.display_name) AS display_name,
+                       i.icon_url
+                FROM bargain_opportunities bo
+                LEFT JOIN items i ON bo.market_hash_name = i.market_hash_name
+                WHERE {where_clause}
+                ORDER BY bo.scanned_at DESC, bo.id DESC
+                LIMIT ? OFFSET ?
+                """,
+                tuple(params) + (limit, offset),
+            )
+            rows = [dict(row) for row in cursor.fetchall()]
+            return rows, total
+
+    def dismiss_bargain_opportunity(self, user_id: int, opportunity_id: int) -> bool:
+        """标记机会为已忽略（不再出现在默认列表）."""
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE bargain_opportunities
+                SET dismissed = 1
+                WHERE id = ? AND user_id = ?
+                """,
+                (opportunity_id, user_id),
+            )
+            return cursor.rowcount > 0
+
+    def clear_bargain_opportunities(
+        self, user_id: int, *, only_dismissed: bool = False
+    ) -> int:
+        """清空指定用户的机会记录（默认全清，可只清 dismissed）."""
+        sql = "DELETE FROM bargain_opportunities WHERE user_id = ?"
+        if only_dismissed:
+            sql += " AND dismissed = 1"
+        with self._cursor() as cursor:
+            cursor.execute(sql, (user_id,))
+            return cursor.rowcount
 
     def get_archived_price_history(
         self,
