@@ -7,11 +7,11 @@
 
 > 本仓库 fork 自上游 [`Pgooone/cs-monitor`](https://github.com/Pgooone/cs-monitor)，已在 `feature/bargain-radar` 分支落地以下定制：
 > - **多用户认证 + 数据隔离**：用户独立 watchlist / 告警 / 极致追踪；个人 SteamDT API Key 经 Fernet 加密存 DB
-> - **Steam 搬砖**：从国内三方平台（BUFF / YYYP / IGXE / C5GAME）低价买入、Steam 社区市场高价卖出的跨市价差扫描器
+> - **跨市差价**：从国内三方平台（BUFF / YYYP / IGXE / C5GAME）低价买入、Steam 社区市场高价卖出的跨市价差扫描器
 >
 > 上游 `main` 分支仅用于同步上游代码；所有定制改动落在 `feature/bargain-radar`（GitHub 默认分支）。
 
-一个轻量级、可自托管的 **CS2 饰品价格监控平台**，基于 [SteamDT](https://doc.steamdt.com/) 开放平台 API。Web 仪表盘里完成所有监控操作：登录账号、查看价格、管理清单、分析趋势、接收告警、扫描搬砖机会。
+一个轻量级、可自托管的 **CS2 饰品价格监控平台**，基于 [SteamDT](https://doc.steamdt.com/) 开放平台 API。Web 仪表盘里完成所有监控操作：登录账号、查看价格、管理清单、分析趋势、接收告警、扫描跨市差价机会。
 
 > 开发规范见 [`CLAUDE.md`](CLAUDE.md)。
 
@@ -22,7 +22,7 @@
 ### 1. 多用户认证与数据隔离
 - **JWT 登录**：bcrypt 哈希密码（rounds=12）+ HS256 访问令牌，强制首次登录改密
 - **每用户独立 SteamDT Key**：用户在 Web 端填入个人 Key，经 `cryptography.Fernet` 对称加密存 DB；调度器循环时按用户解密、各自跑各自的采集
-- **业务数据按 `user_id` 隔离**：watchlist / 告警 / 极致追踪 / 搬砖配置和机会列表跨用户互不可见
+- **业务数据按 `user_id` 隔离**：watchlist / 告警 / 极致追踪 / 跨市差价配置和机会列表跨用户互不可见
 - **管理员后台**：用户增删改、重置密码、启停账号
 - **CLI 兜底**：`scripts/manage_users.py` 提供 list / create / reset-password / set-key 命令，用于初始 bootstrap 或忘密恢复
 
@@ -33,7 +33,7 @@
 - **监控清单**：玻璃拟态卡片视图、Sparkline 迷你图、平台比价、饰品图片、24h 涨跌、阈值编辑
 - **饰品详情**：ECharts K 线 (OHLC + MA 均线)、多平台价差、历史告警关联
 - **极致追踪**：雷达强度进度条 + shimmer 动画、毫秒级快照、卡片网格布局
-- **Steam 搬砖**：扫描参数表单 + 机会列表表格 + 一键扫描 / 忽略 / 分页过滤
+- **跨市差价**：扫描参数表单 + 机会列表表格 + 一键扫描 / 忽略 / 分页过滤
 - **告警历史**：极客表格、类型标签（红涨/绿跌/琥珀量）、按天统计
 - **数据分析**：跨市套利汇总占位（建设中）
 - **个人中心**：改密、绑定 / 更新 SteamDT API Key
@@ -54,7 +54,7 @@
 - 支持**免打扰时段** (`quiet_hours`) 和**自定义冷却期**
 - 价格 & 数量同时变动 → 合并为一条通知（带量价方向智能提示）
 
-### 5. Steam 搬砖（跨市价差扫描）
+### 5. 跨市差价（低买高卖扫描）
 基于本地 `price_records`（SteamDT batch 已采集的各平台最新价）做跨平台价差扫描，**不消耗额外 SteamDT 配额**：
 - 默认买入方：BUFF / YYYP / IGXE / C5GAME（国内三方）
 - 默认卖出方：STEAM（社区市场）
@@ -100,7 +100,7 @@ cs-monitor/
 │   ├── scheduler.py              # APScheduler 多用户调度器
 │   ├── extreme_tracker.py        # 极致追踪：高频单品狙击
 │   ├── trend_analyzer.py         # 趋势分析（MA5/10/20 + surge/drop/oscillate）
-│   └── bargain_scanner.py        # Steam 搬砖：跨市价差扫描
+│   └── bargain_scanner.py        # 跨市差价：跨平台低买高卖扫描
 ├── web/                          # FastAPI Web 层
 │   ├── app.py                    # 应用入口（CORS / 静态前端 SPA fallback）
 │   ├── deps.py                   # 认证 / DB / 配置依赖注入
@@ -113,7 +113,7 @@ cs-monitor/
 │       ├── alerts.py             # 告警列表 / 统计
 │       ├── prices.py             # 价格查询 / 本地搜索
 │       ├── extreme_track.py      # 极致追踪配置 / 快照 / 告警
-│       ├── bargain.py            # Steam 搬砖配置 / 机会 / 扫描
+│       ├── bargain.py            # 跨市差价配置 / 机会 / 扫描
 │       ├── kline.py              # K 线 / 套利 / 趋势
 │       ├── settings.py           # 通知配置 / DB 导出
 │       └── archive.py            # 历史价格归档
@@ -132,7 +132,7 @@ cs-monitor/
 │       └── api/                  # axios 封装 + 401/403 拦截器
 ├── notify/
 │   ├── base.py                   # 通知渠道抽象基类
-│   ├── manager.py                # 通知管理器（普通 / 极致追踪 / 搬砖）
+│   ├── manager.py                # 通知管理器（普通 / 极致追踪 / 跨市差价）
 │   ├── wecom.py                  # 企业微信机器人
 │   ├── telegram.py               # Telegram Bot
 │   └── serverchan.py             # Server 酱
@@ -153,7 +153,7 @@ cs-monitor/
     ├── test_trend_analyzer.py
     ├── test_notify.py
     ├── test_storage.py
-    ├── test_bargain.py           # Steam 搬砖 DB + Scanner + API
+    ├── test_bargain.py           # 跨市差价 DB + Scanner + API
     └── test_web_api.py           # 完整 Web API + 多用户隔离
 ```
 
@@ -226,7 +226,7 @@ uv run python main.py
 启动流程：
 1. 自动建表 (`schema_version=3`)；若检测到旧版单租户 schema 会**自动备份**到 `data/legacy_<ts>/` 后清空重建
 2. 自动创建 `admin` 用户，密码取自 `ADMIN_INITIAL_PASSWORD`，标记为「首次登录强制改密」
-3. 后台调度器启动：监控 / 极致追踪 / Steam 搬砖 / 价格归档 / 全市场饰品同步
+3. 后台调度器启动：监控 / 极致追踪 / 跨市差价 / 价格归档 / 全市场饰品同步
 4. FastAPI 服务在 `http://localhost:8080` 启动
 
 打开浏览器访问 `http://localhost:8080` → 用 `admin` + `ADMIN_INITIAL_PASSWORD` 登录 → 改密 → 进入个人中心绑定 SteamDT API Key → 调度器下一轮就会用你的 Key 开始采集。
@@ -291,7 +291,7 @@ cd frontend && bunx vue-tsc --noEmit && bun run build
 
 ## 配置说明
 
-监控清单 / 极致追踪配置 / Steam 搬砖配置全部存 DB，按用户隔离，通过 Web 仪表盘或 CLI 维护，**不需要修改 `config.py`**。
+监控清单 / 极致追踪配置 / 跨市差价配置全部存 DB，按用户隔离，通过 Web 仪表盘或 CLI 维护，**不需要修改 `config.py`**。
 
 `config.py` 中的默认值（`watchlist` / `extreme_track_list`）仅在主程序逻辑中用作占位，多用户改造后实际不再自动导入到 DB——每个用户登录后在自己的 Watchlist 页面添加监控项即可。
 
@@ -306,7 +306,7 @@ cd frontend && bunx vue-tsc --noEmit && bun run build
 3. **桌面端打包**：Tauri 2.x 封装为 Windows/macOS/Linux 原生应用
 4. **数据归档优化**：更细的归档颗粒度（小时 / 平台）
 
-> 已完成：多用户认证 + 数据隔离、Steam 搬砖跨市扫描、K 线趋势分析、Docker 部署、数据归档、玻璃拟态设计系统、本地饰品搜索 (39K+)、饰品图片自动获取、上游同步分支策略。
+> 已完成：多用户认证 + 数据隔离、跨市差价跨市扫描、K 线趋势分析、Docker 部署、数据归档、玻璃拟态设计系统、本地饰品搜索 (39K+)、饰品图片自动获取、上游同步分支策略。
 
 ---
 

@@ -74,7 +74,7 @@ const menuItems = computed(() => {
     { id: 'Dashboard', label: '实时监控', icon: LayoutDashboard },
     { id: 'Watchlist', label: '监控清单', icon: ListOrdered },
     { id: 'ExtremeTrack', label: '极致追踪', icon: Zap },
-    { id: 'Bargain', label: 'Steam 搬砖', icon: Radar },
+    { id: 'Bargain', label: '跨市差价', icon: Radar },
     { id: 'Alerts', label: '历史告警', icon: Bell },
     { id: 'Stats', label: '数据分析', icon: LineChart },
     { id: 'Settings', label: '系统设置', icon: Settings },

@@ -1,7 +1,7 @@
-"""Steam 搬砖扫描器.
+"""跨市差价扫描器.
 
 业务定位：在国内三方交易平台（BUFF / YYYP / IGXE / C5GAME 等）低价买入，
-搬到 Steam 社区市场高价卖出，赚取跨市差价.
+迁移到 Steam 社区市场高价卖出，赚取跨市差价.
 
 设计：基于 price_records（SteamDT batch 采集结果，市场公共数据）做跨平台
 价差扫描，无需额外调用 SteamDT API.
@@ -33,7 +33,7 @@ DEFAULT_SELL_PLATFORMS: frozenset[str] = frozenset({"STEAM"})
 
 
 class BargainScanner:
-    """Steam 搬砖扫描器（多用户）."""
+    """跨市差价扫描器（多用户）."""
 
     def __init__(
         self,
@@ -82,7 +82,7 @@ class BargainScanner:
         max_buy_price = float(cfg.get("max_buy_price") or 0.0)
         cooldown_minutes = int(cfg.get("alert_cooldown_minutes") or 0)
         notify_enabled = bool(cfg.get("notify_enabled"))
-        # 留空时按 Steam 搬砖默认：买入=国内三方，卖出=Steam
+        # 留空时按跨市差价默认：买入=国内三方，卖出=Steam
         buy_whitelist = (
             self._parse_platform_list(cfg.get("buy_platforms"))
             or set(DEFAULT_BUY_PLATFORMS)
@@ -181,7 +181,7 @@ class BargainScanner:
 
         if results:
             logger.info(
-                f"[bargain] user={self.user_id} 扫描发现 {len(results)} 条新机会"
+                f"[bargain] user={self.user_id} 跨市差价扫描发现 {len(results)} 条新机会"
             )
         else:
             logger.debug(f"[bargain] user={self.user_id} 本轮无新机会")

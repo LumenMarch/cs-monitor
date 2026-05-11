@@ -3,8 +3,8 @@
     <!-- 标题区 -->
     <div class="bargain__header">
       <div>
-        <h2 class="bargain__title">Steam 搬砖</h2>
-        <p class="bargain__desc">从国内三方平台（BUFF / YYYP / IGXE / C5GAME）低价买入，搬到 Steam 社区市场高价卖出，自动扫描跨市价差并按你的阈值推送。</p>
+        <h2 class="bargain__title">跨市差价</h2>
+        <p class="bargain__desc">从国内三方平台（BUFF / YYYP / IGXE / C5GAME）低价买入，迁移到 Steam 社区市场高价卖出，自动扫描跨市价差并按你的阈值推送。</p>
       </div>
       <div class="bargain__header-actions">
         <button
@@ -119,7 +119,7 @@
     <!-- 机会列表 -->
     <div class="bargain__list-section">
       <div class="bargain__list-head">
-        <h3 class="bargain__list-title">捡漏机会</h3>
+        <h3 class="bargain__list-title">差价机会</h3>
         <div class="bargain__filters">
           <n-input
             v-model:value="filterName"
@@ -155,7 +155,7 @@
       <div v-else-if="items.length === 0" class="glass-card bargain__empty">
         <Radar class="bargain__empty-icon" />
         <p class="bargain__empty-text">
-          {{ config.enabled ? '暂无机会，等待下次扫描…' : '请先启用 Steam 搬砖并保存配置' }}
+          {{ config.enabled ? '暂无机会，等待下次扫描…' : '请先启用跨市差价扫描并保存配置' }}
         </p>
       </div>
 

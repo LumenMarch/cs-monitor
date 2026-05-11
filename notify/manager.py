@@ -75,7 +75,7 @@ class NotificationManager:
         return self.channel.send_with_retry(title, content)
 
     def send_bargain_alert(self, alert: dict[str, Any]) -> bool:
-        """发送 Steam 搬砖跨平台价差告警."""
+        """发送跨市差价告警."""
         if not self.channel:
             return False
 
@@ -88,7 +88,7 @@ class NotificationManager:
         profit_amount = float(alert["profit_amount"])
         profit_percent = float(alert["profit_percent"])
 
-        title = "🧱 Steam 搬砖 · 跨平台价差机会"
+        title = "📊 跨市差价 · 跨平台机会"
         content = (
             f"📦 饰品：{display_name}\n"
             f"🟢 买入：{buy_platform} ¥{buy_price:.2f}\n"
