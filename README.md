@@ -128,7 +128,9 @@ cd cs-monitor
 ./init.sh
 ```
 
-`init.sh` 会调用 `uv sync` 自动创建 `.venv`、安装 Python 依赖（按 `pyproject.toml` + `uv.lock`），并自动安装前端 npm 依赖。前置依赖：[uv](https://docs.astral.sh/uv/)（`brew install uv` 或 `curl -LsSf https://astral.sh/uv/install.sh | sh`）。
+`init.sh` 会调用 `uv sync` 自动创建 `.venv`、安装 Python 依赖（按 `pyproject.toml` + `uv.lock`），并通过 `bun install` 安装前端依赖（按 `bun.lock`）。前置依赖：
+- [uv](https://docs.astral.sh/uv/)：`brew install uv` 或 `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- [bun](https://bun.sh/)：`brew install oven-sh/bun/bun` 或 `curl -fsSL https://bun.sh/install | bash`
 
 ### 2. 配置环境变量
 
@@ -143,7 +145,7 @@ cp .env.example .env
 
 ```bash
 # 先构建前端（仅需执行一次，或前端代码更新后重新构建）
-cd frontend && npm run build && cd ..
+cd frontend && bun run build && cd ..
 
 # 启动主程序
 uv run python main.py
@@ -192,21 +194,21 @@ docker-compose down
 # 终端 1：启动后端
 uv run python main.py
 
-# 终端 2：启动前端开发服务器
+# 终端 2：启动前端开发服务器（bun）
 cd frontend
-npm run dev
+bun run dev
 ```
 
-前端开发服务器运行在 `http://localhost:5173`，通过 Vite 代理访问后端 API。开发完成后记得运行 `npm run build` 重新构建，使生产环境生效。
+前端开发服务器运行在 `http://localhost:5173`，通过 Vite 代理访问后端 API。开发完成后记得运行 `bun run build` 重新构建，使生产环境生效。
 
 ### 6. 运行测试
 
 ```bash
 # Python 后端测试
-python -m pytest tests/ -v
+uv run pytest tests/ -v
 
 # 前端构建检查
-cd frontend && npm run build
+cd frontend && bun run build
 ```
 
 ---

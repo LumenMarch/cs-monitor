@@ -8,6 +8,14 @@
 
 ## [bargain-radar 分支] · 进行中
 
+### Changed — 前端包管理切换到 bun（2026-05-11）
+
+- 删除 `frontend/package-lock.json`，改用 `frontend/bun.lock`（文本格式，bun 1.3+ 默认）
+- `init.sh`：检测 `bun` 而非 `node`，`bun install` 替代 `npm install`
+- `Dockerfile` Stage 1 镜像从 `node:20-slim` 切换为 `oven/bun:1`；`bun install --frozen-lockfile` + `bun run build`
+- `CLAUDE.md` / `README.md` 所有 `npm` 命令更新为 `bun` / `bunx`
+- 新增 Key Rule #11：**bun 是唯一前端包管理器**，新增依赖一律 `bun add`
+
 ### Added — 第四阶段：前端多用户 UI（2026-05-11）
 
 **核心基础设施：**

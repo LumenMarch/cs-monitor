@@ -43,17 +43,17 @@ if [ ! -f ".env" ]; then
     echo "  # Then edit .env with your actual API keys and webhook URLs"
 fi
 
-# Check Node.js for frontend tasks
-if command -v node &> /dev/null; then
-    NODE_VERSION=$(node --version 2>&1)
-    echo -e "${GREEN}✓ Node.js found: $NODE_VERSION${NC}"
+# Check bun for frontend tasks
+if command -v bun &> /dev/null; then
+    BUN_VERSION=$(bun --version 2>&1)
+    echo -e "${GREEN}✓ bun: $BUN_VERSION${NC}"
     if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
-        echo "Installing frontend dependencies..."
-        (cd frontend && npm install)
+        echo "Installing frontend dependencies via bun..."
+        (cd frontend && bun install)
     fi
 else
-    echo -e "${YELLOW}Warning: Node.js not found. Frontend development requires Node.js 18+.${NC}"
-    echo "  Download from: https://nodejs.org/"
+    echo -e "${YELLOW}Warning: bun not found. Frontend uses bun as package manager.${NC}"
+    echo "  Install: brew install oven-sh/bun/bun  (or  curl -fsSL https://bun.sh/install | bash)"
 fi
 
 # Verify syntax of core files
@@ -69,7 +69,7 @@ echo "Next steps:"
 echo "  1. Ensure .env is configured with your API keys"
 echo "  2. Run tests:        uv run pytest tests/"
 echo "  3. Run app:          uv run python main.py        (scheduler + Web on :8080)"
-echo "  4. Run frontend dev: cd frontend && npm run dev"
+echo "  4. Run frontend dev: cd frontend && bun run dev"
 echo ""
 echo "Common uv commands:"
 echo "  uv add <pkg>            # add a runtime dependency"

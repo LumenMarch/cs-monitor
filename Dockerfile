@@ -1,23 +1,23 @@
 # =============================================================================
 # CS2 饰品价格波动监控系统 — Docker 多阶段构建
-# Stage 1: 构建前端（Node.js）
-# Stage 2: 构建后端镜像（Python）
+# Stage 1: 构建前端（bun）
+# Stage 2: 构建后端镜像（Python + uv）
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# Stage 1: 前端构建
+# Stage 1: 前端构建（bun）
 # -----------------------------------------------------------------------------
-FROM node:20-slim AS frontend-builder
+FROM oven/bun:1 AS frontend-builder
 
 WORKDIR /app/frontend
 
-# 先复制依赖文件，利用 Docker 层缓存
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+# 先复制依赖元数据，利用 Docker 层缓存
+COPY frontend/package.json frontend/bun.lock ./
+RUN bun install --frozen-lockfile
 
 # 复制前端源码并构建
 COPY frontend/ .
-RUN npm run build
+RUN bun run build
 
 # -----------------------------------------------------------------------------
 # Stage 2: Python 后端运行时

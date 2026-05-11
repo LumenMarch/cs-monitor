@@ -30,7 +30,7 @@ git checkout feature/bargain-radar && git rebase main # 或 merge，视冲突量
 ## 环境与命令
 
 ```bash
-# 首次初始化（uv sync + 前端 npm install）
+# 首次初始化（uv sync + 前端 bun install）
 ./init.sh
 
 # Python 依赖管理（统一走 uv）
@@ -54,11 +54,14 @@ uv run python scripts/manage_users.py create <username> --role <admin|user>
 uv run python scripts/manage_users.py reset-password <username>
 uv run python scripts/manage_users.py set-key <username> # 设置 SteamDT API Key（getpass 输入）
 
-# 前端
-cd frontend && npm run dev # http://localhost:5173
-cd frontend && npm run build # 输出到 frontend/dist
-cd frontend && npx vue-tsc --noEmit
-cd frontend && npm run lint
+# 前端（bun）
+cd frontend && bun install                # 同步 node_modules 到 bun.lock
+cd frontend && bun add <pkg>              # 加依赖
+cd frontend && bun add -d <pkg>           # 加 dev 依赖
+cd frontend && bun run dev                # http://localhost:5173
+cd frontend && bun run build              # 输出到 frontend/dist
+cd frontend && bunx vue-tsc --noEmit      # TypeScript 严格检查
+cd frontend && bun run lint
 ```
 
 ---
@@ -110,7 +113,7 @@ cd frontend && npm run lint
 - 不得在测试里写真实仓库 `data/prices.db`（用 `tempfile` 或环境变量 `CS_MONITOR_DB`）
 
 **前端 MUST**：
-- `npm run build` 通过
+- `bun run build` 通过
 - 同时跑过 light / dark 两种主题验证
 - 移动端 (375px) / 桌面 (1024px+) / 大屏 (1440px+) 三档断点都试
 
@@ -129,4 +132,5 @@ cd frontend && npm run lint
 7. **敏感字段**：API Key、密码哈希、JWT secret 不进日志、不进 commit、不进测试断言文本
 8. **删除上游归档代码**：上游已 `archived/` 的内容不要复活，要复用就重写
 9. **`.env` 与 `.env.example` 同步**：新增配置必须同步 `.env.example` 并在 README/进度日志中说明
-10. **uv 是唯一包管理器**：不要回退到 pip 或手动管理 `.venv`；新增依赖一律 `uv add`
+10. **uv 是唯一 Python 包管理器**：不要回退到 pip 或手动管理 `.venv`；新增依赖一律 `uv add`
+11. **bun 是唯一前端包管理器**：不要回退到 npm/yarn/pnpm；新增依赖一律 `bun add`（或 `bun add -d`），`bun.lock` 必须 commit
