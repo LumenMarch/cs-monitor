@@ -27,19 +27,82 @@
           {{ action.label }}
         </button>
       </template>
+
+      <!-- 用户菜单 -->
+      <NDropdown
+        v-if="auth.isLoggedIn"
+        trigger="click"
+        :options="userMenuOptions"
+        @select="onUserMenuSelect"
+      >
+        <button class="topbar-user" title="账号菜单">
+          <div class="topbar-user__avatar">
+            {{ avatarLetter }}
+          </div>
+          <span class="topbar-user__name">{{ auth.username }}</span>
+        </button>
+      </NDropdown>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Search, RefreshCw, Activity, Upload, Plus, Zap, Download, Save,
+  UserCog, Users as UsersIcon, LogOut,
 } from 'lucide-vue-next'
+import { NDropdown } from 'naive-ui'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useWatchlistStore } from '@/stores/watchlist'
+import { useAuthStore } from '@/stores/auth'
 import { toastSuccess } from '@/composables/useToast'
+
+const auth = useAuthStore()
+
+const avatarLetter = computed(() => (auth.username || '?').charAt(0).toUpperCase())
+
+const userMenuOptions = computed(() => {
+  const items: Array<Record<string, unknown>> = [
+    {
+      label: `${auth.username}（${auth.isAdmin ? '管理员' : '普通用户'}）`,
+      key: '__info',
+      disabled: true,
+    },
+    { type: 'divider', key: '__d1' },
+    {
+      label: '个人中心',
+      key: 'UserCenter',
+      icon: () => h(UserCog, { size: 16 }),
+    },
+  ]
+  if (auth.isAdmin) {
+    items.push({
+      label: '用户管理',
+      key: 'Users',
+      icon: () => h(UsersIcon, { size: 16 }),
+    })
+  }
+  items.push(
+    { type: 'divider', key: '__d2' },
+    {
+      label: '退出登录',
+      key: 'logout',
+      icon: () => h(LogOut, { size: 16 }),
+    },
+  )
+  return items
+})
+
+function onUserMenuSelect(key: string) {
+  if (key === 'logout') {
+    auth.logout()
+    router.replace({ name: 'Login' })
+    return
+  }
+  router.push({ name: key })
+}
 
 defineProps<{
   collapsed: boolean
@@ -65,6 +128,8 @@ const viewTitle = computed(() => {
     Stats: '市场趋势分析',
     Settings: '系统配置',
     ItemDetail: '饰品详情',
+    UserCenter: '个人中心',
+    Users: '用户管理',
   }
   return map[route.name as string] || '仪表盘'
 })
@@ -258,5 +323,59 @@ html:not(.dark) .topbar-icon-btn {
 html:not(.dark) .topbar-icon-btn:hover {
   color: #0f172a;
   background: rgba(0, 0, 0, 0.04);
+}
+
+/* 用户菜单按钮 */
+.topbar-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 150ms;
+  font-size: 0.85rem;
+}
+
+.topbar-user:hover {
+  background: rgba(99, 102, 241, 0.16);
+  border-color: rgba(99, 102, 241, 0.45);
+}
+
+.topbar-user__avatar {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #818cf8);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.topbar-user__name {
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .topbar-user__name {
+    display: none;
+  }
+}
+
+html:not(.dark) .topbar-user {
+  color: #1e293b;
 }
 </style>

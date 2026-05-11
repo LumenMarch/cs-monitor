@@ -8,6 +8,32 @@
 
 ## [bargain-radar 分支] · 进行中
 
+### Added — 第四阶段：前端多用户 UI（2026-05-11）
+
+**核心基础设施：**
+- `frontend/src/api/index.ts`：
+  - 加入 `getStoredToken / setStoredToken / clearStoredToken`（localStorage 持久化）
+  - request 拦截器自动注入 `Authorization: Bearer <token>`
+  - response 拦截器：401 → 清 token 跳 `/login?next=...`；403 + `X-Password-Change-Required` → 跳 `/change-password`
+  - 新增 11 个 auth/users 接口方法（login / me / changePassword / setSteamdtKey / deleteSteamdtKey / listUsers / createUser / updateUser / resetUserPassword / deleteUser）
+- `frontend/src/stores/auth.ts`：重写为真实多用户 store，暴露 `token / user / isLoggedIn / isAdmin / username / requiresPasswordChange / hasSteamdtKey` 等响应式状态
+- `frontend/src/router/index.ts`：
+  - 加入 `/login`、`/change-password`、`/user-center`、`/users`
+  - 全局 `beforeEach` 守卫：未登录跳 Login、必改密拦截、admin-only 路由保护、已登录访问 /login 跳首页
+- `frontend/src/main.ts`：启动时 `auth.initFromStorage()` 校验 token
+
+**新建页面（4 个）：**
+- `views/Login.vue`：登录页 + 错误提示 + `next` 参数返回
+- `views/ChangePassword.vue`：改密页（强制改密时禁用取消按钮）
+- `views/UserCenter.vue`：个人中心 = 账号信息 + SteamDT API Key 管理 + 改密
+- `views/Users.vue`：管理员后台 = 用户列表 + 新建 / 切换角色 / 启停 / 重置密码 / 删除 + 防自损守卫
+
+**布局集成：**
+- `components/layout/SidebarContent.vue`：侧边栏菜单加"个人中心"、对 admin 加"用户管理"
+- `components/layout/TopBar.vue`：右上角加用户头像 + 下拉菜单（个人中心 / 用户管理 / 退出登录）
+
+构建验证：`npm run build` 通过，`vue-tsc --noEmit` 0 错误
+
 ### Added — 第三阶段：调度器多用户循环（2026-05-11）
 
 - `core/monitor.py` `PriceMonitor` 接收 `user_id`，watchlist 采集按用户隔离

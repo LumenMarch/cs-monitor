@@ -56,22 +56,33 @@ import {
   Settings,
   Scan,
   HelpCircle,
+  UserCog,
+  Users as UsersIcon,
 } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const emit = defineEmits<{ (e: 'navigate'): void }>()
 
 const activeKey = computed(() => route.name as string)
 
-const menuItems = [
-  { id: 'Dashboard', label: '实时监控', icon: LayoutDashboard },
-  { id: 'Watchlist', label: '监控清单', icon: ListOrdered },
-  { id: 'ExtremeTrack', label: '极致追踪', icon: Zap },
-  { id: 'Alerts', label: '历史告警', icon: Bell },
-  { id: 'Stats', label: '数据分析', icon: LineChart },
-  { id: 'Settings', label: '系统设置', icon: Settings },
-]
+const menuItems = computed(() => {
+  const base: Array<{ id: string; label: string; icon: any }> = [
+    { id: 'Dashboard', label: '实时监控', icon: LayoutDashboard },
+    { id: 'Watchlist', label: '监控清单', icon: ListOrdered },
+    { id: 'ExtremeTrack', label: '极致追踪', icon: Zap },
+    { id: 'Alerts', label: '历史告警', icon: Bell },
+    { id: 'Stats', label: '数据分析', icon: LineChart },
+    { id: 'Settings', label: '系统设置', icon: Settings },
+    { id: 'UserCenter', label: '个人中心', icon: UserCog },
+  ]
+  if (auth.isAdmin) {
+    base.push({ id: 'Users', label: '用户管理', icon: UsersIcon })
+  }
+  return base
+})
 
 function navigate(name: string) {
   router.push({ name })

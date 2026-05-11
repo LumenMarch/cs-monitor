@@ -1,6 +1,20 @@
 import axios from 'axios'
 import { toastError, toastWarning } from '@/composables/useToast'
 
+const TOKEN_STORAGE_KEY = 'cs-monitor.access_token'
+
+export function getStoredToken(): string | null {
+  return localStorage.getItem(TOKEN_STORAGE_KEY)
+}
+
+export function setStoredToken(token: string): void {
+  localStorage.setItem(TOKEN_STORAGE_KEY, token)
+}
+
+export function clearStoredToken(): void {
+  localStorage.removeItem(TOKEN_STORAGE_KEY)
+}
+
 const api = axios.create({
   baseURL: '/api',
   timeout: 15000,
@@ -9,9 +23,14 @@ const api = axios.create({
   },
 })
 
-// Request 拦截器：请求日志
+// Request 拦截器：注入 JWT + 请求日志
 api.interceptors.request.use(
   (config) => {
+    const token = getStoredToken()
+    if (token) {
+      config.headers = config.headers || {}
+      ;(config.headers as Record<string, string>).Authorization = `Bearer ${token}`
+    }
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
       console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, config.params || config.data || '')
@@ -21,7 +40,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
-// Response 拦截器：错误处理 + 日志
+// Response 拦截器：错误处理 + 401/403 自动跳转
 api.interceptors.response.use(
   (response) => {
     if (import.meta.env.DEV) {
@@ -38,6 +57,24 @@ api.interceptors.response.use(
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
       console.error(`[API] ${error.config?.method?.toUpperCase()} ${url} -> ${status}:`, detail)
+    }
+
+    // 401：token 过期/无效 → 清 token 跳登录页（避免在 login 接口本身的 401 上死循环）
+    if (status === 401 && !url.includes('/auth/login')) {
+      clearStoredToken()
+      const isOnLoginPage = window.location.pathname === '/login'
+      if (!isOnLoginPage) {
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`
+      }
+    }
+
+    // 403 + X-Password-Change-Required → 强制改密
+    if (
+      status === 403
+      && error.response?.headers?.['x-password-change-required'] === '1'
+      && !window.location.pathname.startsWith('/change-password')
+    ) {
+      window.location.href = '/change-password'
     }
 
     if (status >= 500) {
@@ -303,6 +340,57 @@ export interface RefreshResponse {
 }
 
 /** 本地搜索结果项 */
+// ============================================================
+// 认证与用户管理（v2 多用户）
+// ============================================================
+export interface LoginResponse {
+  access_token: string
+  token_type: string
+  expires_in: number
+  user_id: number
+  username: string
+  role: string
+  requires_password_change: boolean
+}
+
+export interface MeResponse {
+  id: number
+  username: string
+  role: string
+  must_change_password: boolean
+  has_steamdt_key: boolean
+  created_at: string | null
+  last_login_at: string | null
+}
+
+export interface UserResponse {
+  id: number
+  username: string
+  role: string
+  is_active: boolean
+  must_change_password: boolean
+  has_steamdt_key: boolean
+  created_at: string | null
+  last_login_at: string | null
+}
+
+export interface CreateUserPayload {
+  username: string
+  password: string
+  role: 'admin' | 'user'
+  must_change_password: boolean
+}
+
+export interface UpdateUserPayload {
+  role?: 'admin' | 'user'
+  is_active?: boolean
+}
+
+export interface ResetPasswordPayload {
+  new_password: string
+  must_change_password: boolean
+}
+
 export interface SearchItemResult {
   market_hash_name: string
   name: string | null
@@ -318,6 +406,41 @@ export interface ItemPriceResult {
 }
 
 export default {
+  // ─── 认证 ──────────────────────────────────────────────
+  login(payload: { username: string; password: string }) {
+    return api.post<LoginResponse>('/auth/login', payload)
+  },
+  me() {
+    return api.get<MeResponse>('/auth/me')
+  },
+  changePassword(payload: { current_password: string; new_password: string }) {
+    return api.post('/auth/change-password', payload)
+  },
+  setSteamdtKey(api_key: string) {
+    return api.put('/auth/steamdt-key', { api_key })
+  },
+  deleteSteamdtKey() {
+    return api.delete('/auth/steamdt-key')
+  },
+
+  // ─── 用户管理（仅 admin）───────────────────────────────
+  listUsers(include_inactive = false) {
+    return api.get<UserResponse[]>('/users', { params: { include_inactive } })
+  },
+  createUser(payload: CreateUserPayload) {
+    return api.post<UserResponse>('/users', payload)
+  },
+  updateUser(id: number, payload: UpdateUserPayload) {
+    return api.patch<UserResponse>(`/users/${id}`, payload)
+  },
+  resetUserPassword(id: number, payload: ResetPasswordPayload) {
+    return api.post(`/users/${id}/reset-password`, payload)
+  },
+  deleteUser(id: number) {
+    return api.delete(`/users/${id}`)
+  },
+
+  // ─── 业务接口（保持不变）────────────────────────────────
   health() {
     return api.get('/health')
   },
