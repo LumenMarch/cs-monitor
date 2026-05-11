@@ -1,5 +1,5 @@
 /**
- * Naive UI Theme Overrides — 极客黑（Geek Black）
+ * Naive UI Theme Overrides — SkinRadar Terminal
  *
  * 将 Design Tokens 映射到 Naive UI 的 themeOverrides 结构。
  * light / dark 两套配置，与 useTheme 联动。
@@ -100,13 +100,13 @@ const darkCommon: GlobalThemeOverrides['common'] = {
   textColor2: '#94a3b8',
   textColor3: '#71717a',
 
-  bodyColor: '#050505',
-  cardColor: '#0f0f12',
-  modalColor: '#16161d',
-  popoverColor: '#16161d',
-  dividerColor: '#1f1f23',
-  borderColor: '#1f1f23',
-  tableHeaderColor: '#0f0f12',
+  bodyColor: '#07080a',
+  cardColor: '#101216',
+  modalColor: '#171a20',
+  popoverColor: '#171a20',
+  dividerColor: '#242832',
+  borderColor: '#242832',
+  tableHeaderColor: '#101216',
 
   hoverColor: 'rgba(255,255,255,0.05)',
   pressedColor: 'rgba(255,255,255,0.08)',
@@ -159,21 +159,21 @@ export const darkThemeOverrides: GlobalThemeOverrides = {
   },
   Card: {
     borderRadius: '12px',
-    borderColor: '#1f1f23',
-    color: '#0f0f12',
+    borderColor: '#242832',
+    color: '#101216',
   },
   DataTable: {
     borderRadius: '12px',
     thFontSize: '12px',
     tdFontSize: '13px',
-    thColor: '#0f0f12',
+    thColor: '#101216',
     tdColor: 'transparent',
-    borderColor: '#1f1f23',
+    borderColor: '#242832',
   },
   Input: {
     borderRadius: '8px',
     color: 'rgba(255,255,255,0.03)',
-    borderColor: '#1f1f23',
+    borderColor: '#242832',
     colorFocus: 'rgba(255,255,255,0.05)',
   },
   Tag: {

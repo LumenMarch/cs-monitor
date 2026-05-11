@@ -3,8 +3,8 @@
     <!-- 标题区 -->
     <div class="bargain__header">
       <div>
-        <h2 class="bargain__title">跨市差价</h2>
-        <p class="bargain__desc">从国内三方平台（BUFF / YYYP / IGXE / C5GAME）低价买入，迁移到 Steam 社区市场高价卖出，自动扫描跨市价差并按你的阈值推送。</p>
+        <h2 class="bargain__title">跨市差价雷达</h2>
+        <p class="bargain__desc">扫描国内平台与 Steam 社区市场的价格差，按利润阈值沉淀可行动机会。</p>
       </div>
       <div class="bargain__header-actions">
         <button
@@ -17,6 +17,29 @@
         </button>
       </div>
     </div>
+
+    <section class="metric-strip">
+      <div class="metric-cell">
+        <span class="metric-cell__label">Scanner</span>
+        <span class="metric-cell__value bargain__metric-state">{{ config.enabled ? 'ON' : 'OFF' }}</span>
+        <span class="metric-cell__sub">{{ config.enabled ? '差价扫描已启用' : '保存配置后启用扫描' }}</span>
+      </div>
+      <div class="metric-cell">
+        <span class="metric-cell__label">Interval</span>
+        <span class="metric-cell__value">{{ config.interval_minutes }}</span>
+        <span class="metric-cell__sub">分钟 / 轮</span>
+      </div>
+      <div class="metric-cell">
+        <span class="metric-cell__label">Min Profit</span>
+        <span class="metric-cell__value">{{ config.min_profit_percent.toFixed(1) }}%</span>
+        <span class="metric-cell__sub">最低毛利率</span>
+      </div>
+      <div class="metric-cell">
+        <span class="metric-cell__label">Open Signals</span>
+        <span class="metric-cell__value">{{ activeOpportunityCount }}</span>
+        <span class="metric-cell__sub">当前未忽略机会</span>
+      </div>
+    </section>
 
     <!-- 配置卡片 -->
     <div class="glass-card bargain__config">
@@ -260,6 +283,8 @@ const filterName = ref('')
 const filterMinProfit = ref<number | null>(null)
 const includeDismissed = ref(false)
 
+const activeOpportunityCount = computed(() => items.value.filter((item) => !item.dismissed).length)
+
 const buyPlatformOptions = [
   { label: 'BUFF', value: 'BUFF' },
   { label: 'YYYP（悠悠有品）', value: 'YYYP' },
@@ -390,6 +415,11 @@ onMounted(async () => {
   font-weight: 500;
   font-size: 0.875rem;
   margin: 0.25rem 0 0 0;
+}
+
+.bargain__metric-state {
+  color: var(--cs-radar);
+  font-size: 1.35rem;
 }
 
 .bargain__header-actions {

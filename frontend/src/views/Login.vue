@@ -5,8 +5,8 @@
         <div class="login__logo">
           <Radar :size="28" />
         </div>
-        <h1 class="login__title">CS2 Monitor</h1>
-        <p class="login__subtitle">多用户监控 · 捡漏雷达</p>
+        <h1 class="login__title">SkinRadar</h1>
+        <p class="login__subtitle">CS Trading Radar</p>
       </div>
 
       <NForm
@@ -118,14 +118,13 @@ async function onSubmit() {
   justify-content: center;
   padding: 1.5rem;
   background:
-    radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.12) 0, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(99, 102, 241, 0.08) 0, transparent 50%),
-    #050505;
+    linear-gradient(180deg, rgba(99, 102, 241, 0.08), transparent 32rem),
+    #07080a;
 }
 
 html:not(.dark) .login {
   background:
-    radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.1) 0, transparent 50%),
+    linear-gradient(180deg, rgba(99, 102, 241, 0.08), transparent 28rem),
     #f8fafc;
 }
 
@@ -153,10 +152,10 @@ html:not(.dark) .login {
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #6366f1, #818cf8);
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   color: #fff;
   margin-bottom: 0.75rem;
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.5);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.12), 0 16px 36px rgba(34, 197, 94, 0.12);
 }
 
 .login__title {

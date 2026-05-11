@@ -3,12 +3,12 @@
     <!-- Logo 区 -->
     <div class="sidebar-header">
       <div class="sidebar-logo">
-        <div class="sidebar-logo__icon">
-          <Scan class="w-5 h-5 text-white" />
+        <div class="sidebar-logo__icon" aria-hidden="true">
+          <Radar class="w-5 h-5 text-white" />
         </div>
         <div class="sidebar-logo__text">
-          <h1 class="sidebar-logo__title">CS<span class="text-brand">MONITOR</span></h1>
-          <p class="sidebar-logo__subtitle">Trading Terminal</p>
+          <h1 class="sidebar-logo__title">Skin<span class="text-brand">Radar</span></h1>
+          <p class="sidebar-logo__subtitle">CS Trading Radar</p>
         </div>
       </div>
     </div>
@@ -36,7 +36,7 @@
       </button>
       <div class="sidebar-divider" />
       <div class="sidebar-status">
-        <div class="sidebar-status__label">服务状态</div>
+        <div class="sidebar-status__label">Radar Link</div>
         <div class="sidebar-status__row">
           <div class="sidebar-status__dot" />
           <span class="sidebar-status__text">API 已连接</span>
@@ -56,7 +56,6 @@ import {
   Bell,
   LineChart,
   Settings,
-  Scan,
   HelpCircle,
   UserCog,
   Radar,
@@ -77,9 +76,9 @@ const activeKey = computed(() => route.name as string)
 
 const menuItems = computed(() => {
   const base: Array<{ id: string; label: string; icon: any }> = [
-    { id: 'Dashboard', label: '实时监控', icon: LayoutDashboard },
+    { id: 'Dashboard', label: '雷达指挥台', icon: LayoutDashboard },
     { id: 'Watchlist', label: '监控清单', icon: ListOrdered },
-    { id: 'ExtremeTrack', label: '极致追踪', icon: Zap },
+    { id: 'ExtremeTrack', label: '高频追踪', icon: Zap },
     { id: 'Bargain', label: '跨市差价', icon: Radar },
     { id: 'Alerts', label: '历史告警', icon: Bell },
     { id: 'Stats', label: '数据分析', icon: LineChart },
@@ -106,7 +105,7 @@ function navigate(name: string) {
 }
 
 .sidebar-header {
-  height: 5rem;
+  height: 4.75rem;
   display: flex;
   align-items: center;
   padding: 0 1.5rem;
@@ -121,16 +120,16 @@ function navigate(name: string) {
 .sidebar-logo__icon {
   width: 2.25rem;
   height: 2.25rem;
-  border-radius: 0.75rem;
-  background: #6366f1;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, #6366f1, #22c55e);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 10px 24px rgba(34, 197, 94, 0.14);
 }
 
 .sidebar-logo__title {
-  font-size: 0.875rem;
+  font-size: 0.95rem;
   font-weight: 800;
   letter-spacing: 0;
   color: #ffffff;
@@ -142,7 +141,7 @@ function navigate(name: string) {
 }
 
 .sidebar-logo__subtitle {
-  font-size: 10px;
+  font-size: 9px;
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 0.15em;
@@ -152,7 +151,7 @@ function navigate(name: string) {
 
 .sidebar-nav {
   flex: 1;
-  padding: 2rem 0.75rem;
+  padding: 1.25rem 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -171,7 +170,7 @@ function navigate(name: string) {
 
 .sidebar-divider {
   height: 1px;
-  background: #1f1f23;
+  background: #242832;
   margin: 0 0.5rem;
 }
 
@@ -221,7 +220,7 @@ function navigate(name: string) {
   height: 0.5rem;
   border-radius: 50%;
   background: #22c55e;
-  box-shadow: 0 0 8px #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12);
 }
 
 .sidebar-status__text {

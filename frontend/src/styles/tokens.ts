@@ -1,8 +1,8 @@
 /**
- * Design Tokens — CS2 Monitor 设计系统 v3
+ * Design Tokens — SkinRadar 设计系统 v4
  *
- * 设计方向：极客黑（Geek Black）
- * 参考 React 版视觉效果：近纯黑底 + Indigo 品牌色 + 玻璃拟态
+ * 设计方向：专业雷达监控型交易终端
+ * 近黑底 + Indigo 品牌色 + 雷达绿状态强调 + 克制面板
  */
 
 // ===== 品牌色 =====
@@ -57,11 +57,11 @@ export const neutral = {
     950: '#020617',
   },
   dark: {
-    50: '#050505',    // 页面背景（近纯黑）
-    100: '#0f0f12',   // 卡片背景
-    200: '#16161d',   // 悬停表面
-    300: '#1f1f23',   // 边框
-    400: '#2d2d35',   // 高亮边框
+    50: '#07080a',    // 页面背景（近黑）
+    100: '#101216',   // 卡片背景
+    200: '#171a20',   // 悬停表面
+    300: '#242832',   // 边框
+    400: '#343a46',   // 高亮边框
     500: '#3f3f46',   // 禁用/占位
     600: '#71717a',   // 次要文字
     700: '#94a3b8',   // 正文次要文字 (on-muted)
@@ -91,9 +91,9 @@ export type RiseFallMode = 'china' | 'international'
 
 // ===== 字体 =====
 export const fontFamily = {
-  sans: "'Inter', 'PingFang SC', 'Microsoft YaHei', 'HarmonyOS Sans', sans-serif",
+  sans: "'Aptos', 'PingFang SC', 'Microsoft YaHei', 'HarmonyOS Sans', sans-serif",
   mono: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace",
-  display: "'Inter', 'PingFang SC', sans-serif",
+  display: "'Aptos Display', 'Aptos', 'PingFang SC', sans-serif",
 } as const
 
 // ===== 字号 =====
@@ -184,13 +184,12 @@ export const transition = {
 // ===== ECharts 颜色序列 =====
 export const chartColors = [
   '#6366f1',  // 品牌紫
+  '#22c55e',  // 雷达绿
   '#06b6d4',  // 青色
-  '#22c55e',  // 绿色
   '#ef4444',  // 红色
-  '#a855f7',  // 紫色
   '#3b82f6',  // 蓝色
-  '#ec4899',  // 粉色
   '#eab308',  // 黄色
+  '#a855f7',  // 紫色
 ] as const
 
 // ===== Z-Index =====

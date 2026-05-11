@@ -3,8 +3,25 @@
     <!-- 标题区 -->
     <div class="alerts__header">
       <div>
-        <h2 class="alerts__title">历史告警记录</h2>
-        <p class="alerts__desc">查看系统根据预设条件触发的实时推送历史。</p>
+        <h2 class="alerts__title">告警雷达</h2>
+        <p class="alerts__desc">按类型与饰品名称筛选触发记录，快速定位异常价格和高频追踪事件。</p>
+      </div>
+      <div class="alerts__filters">
+        <n-select
+          v-model:value="typeFilter"
+          size="small"
+          clearable
+          :options="typeOptions"
+          placeholder="告警类型"
+          style="width: 10rem"
+        />
+        <n-input
+          v-model:value="keyword"
+          size="small"
+          clearable
+          placeholder="搜索饰品"
+          style="width: 13rem"
+        />
       </div>
     </div>
 
@@ -19,7 +36,7 @@
     </div>
 
     <!-- 空态 -->
-    <div v-else-if="items.length === 0" class="glass-card alerts__empty">
+    <div v-else-if="filteredItems.length === 0" class="glass-card alerts__empty">
       <Bell class="alerts__empty-icon" />
       <p class="alerts__empty-text">暂无告警记录</p>
     </div>
@@ -36,7 +53,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="alert in items" :key="alert.id">
+          <tr v-for="alert in filteredItems" :key="alert.id">
             <td class="alerts__time font-mono-num">{{ formatDateTime(alert.notified_at) }}</td>
             <td class="alerts__name">{{ alert.display_name || alert.market_hash_name }}</td>
             <td class="alerts__detail">
@@ -51,7 +68,7 @@
             <td>
               <span class="alerts__type-badge" :class="getTypeBadgeClass(alert.alert_type)">
                 <component :is="getTypeIcon(alert.alert_type)" class="w-3 h-3" />
-                {{ typeMap[alert.alert_type] || alert.alert_type }}
+              {{ typeMap[alert.alert_type] || alert.alert_type }}
               </span>
             </td>
           </tr>
@@ -72,8 +89,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { NPagination } from 'naive-ui'
+import { computed, ref, onMounted } from 'vue'
+import { NInput, NPagination, NSelect } from 'naive-ui'
 import { Bell, TrendingDown, TrendingUp, AlertCircle, Zap } from 'lucide-vue-next'
 import api, { type AlertRecord } from '@/api'
 import { toastError } from '@/composables/useToast'
@@ -84,14 +101,28 @@ const total = ref(0)
 const page = ref(1)
 const limit = ref(20)
 const loading = ref(false)
+const typeFilter = ref<string | null>(null)
+const keyword = ref('')
 
 const typeMap: Record<string, string> = {
-  price_surge: '📈 涨价',
-  price_drop: '📉 跌价',
+  price_surge: '涨价',
+  price_drop: '跌价',
   price_change: '价格变动',
   quantity_change: '数量变动',
   both: '综合变动',
 }
+
+const typeOptions = Object.entries(typeMap).map(([value, label]) => ({ value, label }))
+
+const filteredItems = computed(() => {
+  const q = keyword.value.trim().toLowerCase()
+  return items.value.filter((item) => {
+    const matchType = !typeFilter.value || item.alert_type === typeFilter.value
+    const name = `${item.display_name || ''} ${item.market_hash_name}`.toLowerCase()
+    const matchKeyword = !q || name.includes(q)
+    return matchType && matchKeyword
+  })
+})
 
 function getAlertPrice(alert: AlertRecord): number | null {
   if ('current_price' in alert) return (alert as any).current_price
@@ -150,9 +181,24 @@ onMounted(() => {
 .alerts {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.25rem;
   max-width: 80rem;
   margin: 0 auto;
+}
+
+.alerts__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.alerts__filters {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .alerts__title {
@@ -175,6 +221,7 @@ onMounted(() => {
 .alerts__table-wrap {
   padding: 0;
   overflow: hidden;
+  border-radius: 0.5rem;
 }
 
 .alerts__table {

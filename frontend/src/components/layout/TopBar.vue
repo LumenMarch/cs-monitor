@@ -193,8 +193,9 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 const viewTitle = computed(() => {
   const map: Record<string, string> = {
     Dashboard: '数据概览',
+    Bargain: '跨市差价雷达',
     Watchlist: '监控清单',
-    ExtremeTrack: '极致追踪',
+    ExtremeTrack: '高频追踪',
     Alerts: '历史告警',
     Stats: '市场趋势分析',
     Settings: '系统配置',
@@ -206,7 +207,7 @@ const viewTitle = computed(() => {
 })
 
 const searchPlaceholder = computed(() => {
-  return '快速搜索饰品名称...'
+  return '搜索饰品、平台价格与追踪目标...'
 })
 
 const searchPanelVisible = computed(() =>
@@ -227,8 +228,8 @@ const contextActions = computed<ContextAction[]>(() => {
   switch (name) {
     case 'Dashboard':
       return [
-        { id: 'status', label: '服务状态', icon: Activity, primary: false, handler: handleStatusCheck },
-        { id: 'sync', label: '强制同步', icon: RefreshCw, primary: true, handler: handleForceSync },
+        { id: 'status', label: '链路探测', icon: Activity, primary: false, handler: handleStatusCheck },
+        { id: 'sync', label: '同步雷达', icon: RefreshCw, primary: true, handler: handleForceSync },
       ]
     case 'Watchlist':
       return [
@@ -236,8 +237,8 @@ const contextActions = computed<ContextAction[]>(() => {
       ]
     case 'ExtremeTrack':
       return [
-        { id: 'speed', label: 'API 测速', icon: Activity, primary: false, handler: handleStatusCheck, style: 'color: #16a34a; border-color: rgba(34,197,94,0.3)' },
-        { id: 'start', label: '启动新任务', icon: Zap, primary: true, handler: () => router.push({ name: 'ExtremeTrack', query: { action: 'add' } }), style: 'background: #22c55e; color: #052e16; box-shadow: 0 4px 12px rgba(34,197,94,0.2)' },
+        { id: 'speed', label: '链路测速', icon: Activity, primary: false, handler: handleStatusCheck, style: 'color: #22c55e; border-color: rgba(34,197,94,0.3)' },
+        { id: 'start', label: '新建雷达', icon: Zap, primary: true, handler: () => router.push({ name: 'ExtremeTrack', query: { action: 'add' } }), style: 'background: #22c55e; color: #052e16; box-shadow: 0 10px 24px rgba(34,197,94,0.16)' },
       ]
     default:
       return []
@@ -341,15 +342,13 @@ watch(
 
 <style scoped>
 .topbar {
-  height: 5rem;
-  border-bottom: 1px solid #1f1f23;
-  background: rgba(5, 5, 5, 0.5);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  height: 4.5rem;
+  border-bottom: 1px solid #242832;
+  background: rgba(7, 8, 10, 0.9);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2rem;
+  padding: 0 1.25rem;
   z-index: 40;
   flex-shrink: 0;
   gap: 1rem;
@@ -363,10 +362,10 @@ watch(
 }
 
 .topbar-title {
-  font-size: 1.125rem;
-  font-weight: 700;
+  font-size: 0.95rem;
+  font-weight: 800;
   color: #ffffff;
-  text-transform: capitalize;
+  letter-spacing: 0.04em;
   margin: 0;
   white-space: nowrap;
 }
@@ -374,7 +373,7 @@ watch(
 .topbar-divider {
   height: 1.5rem;
   width: 1px;
-  background: #1f1f23;
+  background: #242832;
 }
 
 .topbar-search {
@@ -398,11 +397,11 @@ watch(
 }
 
 .topbar-search__input {
-  background: #0f0f12;
-  border: 1px solid #1f1f23;
+  background: #101216;
+  border: 1px solid #242832;
   color: #ffffff;
   font-size: 0.75rem;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   padding: 0.625rem 1rem 0.625rem 2.75rem;
   width: 12rem;
   transition: all 200ms;
@@ -426,9 +425,9 @@ watch(
   left: 0;
   width: min(26rem, calc(100vw - 2rem));
   padding: 0.375rem;
-  border: 1px solid #1f1f23;
-  border-radius: 0.75rem;
-  background: rgba(15, 15, 18, 0.98);
+  border: 1px solid #242832;
+  border-radius: 0.5rem;
+  background: rgba(16, 18, 22, 0.98);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 
@@ -485,7 +484,7 @@ watch(
 .topbar-icon-btn {
   padding: 0.625rem;
   color: #94a3b8;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   transition: all 200ms;
   background: transparent;
   border: none;

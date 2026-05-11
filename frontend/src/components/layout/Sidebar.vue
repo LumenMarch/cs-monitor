@@ -33,13 +33,11 @@ defineEmits<{
 
 <style scoped>
 .sidebar {
-  width: 16rem;
+  width: 15.25rem;
   height: 100vh;
   flex-shrink: 0;
-  border-right: 1px solid #1f1f23;
-  background: rgba(5, 5, 5, 0.3);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-right: 1px solid #242832;
+  background: rgba(7, 8, 10, 0.96);
   display: flex;
   flex-direction: column;
   z-index: 50;
@@ -67,6 +65,6 @@ defineEmits<{
 
 html:not(.dark) .sidebar {
   border-right-color: #e2e8f0;
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.96);
 }
 </style>

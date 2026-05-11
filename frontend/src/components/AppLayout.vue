@@ -8,8 +8,6 @@
       @update:mobile-drawer-open="mobileDrawerOpen = $event"
     />
     <div class="app-layout__main">
-      <!-- 背景装饰光晕 -->
-      <div class="app-layout__glow" />
       <TopBar
         :collapsed="collapsed"
         :is-mobile="isMobile"
@@ -68,7 +66,9 @@ onUnmounted(() => {
   display: flex;
   height: 100vh;
   overflow: hidden;
-  background: #050505;
+  background:
+    linear-gradient(180deg, rgba(99, 102, 241, 0.04), transparent 18rem),
+    #07080a;
   color: #ffffff;
 }
 
@@ -101,43 +101,10 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.app-layout__glow {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.app-layout__glow::before,
-.app-layout__glow::after {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-}
-
-.app-layout__glow::before {
-  top: -10%;
-  left: -10%;
-  width: 40%;
-  height: 40%;
-  background: rgba(99, 102, 241, 0.05);
-  filter: blur(120px);
-}
-
-.app-layout__glow::after {
-  bottom: -10%;
-  right: -10%;
-  width: 30%;
-  height: 30%;
-  background: rgba(99, 102, 241, 0.1);
-  filter: blur(100px);
-}
-
 .app-layout__content {
   flex: 1;
   overflow-y: auto;
-  padding: 2rem 1.5rem;
+  padding: 1.25rem 1.25rem 2rem;
   position: relative;
   z-index: 1;
 }

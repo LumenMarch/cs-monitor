@@ -26,7 +26,7 @@ const props = withDefaults(
     fallbackEmoji?: string
   }>(),
   {
-    fallbackEmoji: '🔫',
+    fallbackEmoji: 'CS',
   },
 )
 
@@ -78,8 +78,14 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
-  opacity: 0.4;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  color: var(--cs-text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--cs-border);
+  border-radius: 0.375rem;
   user-select: none;
 }
 </style>

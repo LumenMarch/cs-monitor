@@ -308,9 +308,9 @@ const minPlatformPrice = computed(() => {
 
 const trendLabel = computed(() => {
   const map: Record<string, string> = {
-    surge: '📈 连涨趋势',
-    drop: '📉 连跌趋势',
-    oscillate: '🔄 震荡整理',
+    surge: '连涨趋势',
+    drop: '连跌趋势',
+    oscillate: '震荡整理',
   }
   return trendData.value ? map[trendData.value.trend] || '' : ''
 })
@@ -814,11 +814,11 @@ const alertColumns: DataTableColumns<AlertRecord> = [
     key: 'alert_type',
     render(row) {
       const typeMap: Record<string, string> = {
-        price_surge: '📈 涨价',
-        price_drop: '📉 跌价',
-        both: '🔔 量价变动',
-        price_change: '💰 价格变动',
-        quantity_change: '📦 数量变动',
+        price_surge: '涨价',
+        price_drop: '跌价',
+        both: '量价变动',
+        price_change: '价格变动',
+        quantity_change: '数量变动',
       }
       return typeMap[row.alert_type] || row.alert_type
     },
@@ -910,16 +910,14 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 1rem;
   padding: 1.25rem;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-radius: 1rem;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--cs-bg-glass);
+  border-radius: 0.5rem;
+  border: 1px solid var(--cs-border);
   margin-bottom: 1rem;
 }
 html.dark .item-hero {
-  background: rgba(15, 15, 18, 0.6);
-  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(16, 18, 22, 0.86);
+  border-color: #242832;
 }
 
 .item-hero__left {
@@ -944,8 +942,8 @@ html.dark .item-hero {
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.2));
 }
 .item-hero__title {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  font-weight: 900;
   margin: 0;
   letter-spacing: 0;
   word-break: break-word;
@@ -953,8 +951,8 @@ html.dark .item-hero {
 .item-hero__wear {
   font-size: 0.75rem;
   padding: 0.125rem 0.5rem;
-  border-radius: 0.25rem;
-  font-weight: 500;
+  border-radius: 0.375rem;
+  font-weight: 800;
 }
 .wear--fn {
   background: #dcfce7;
@@ -1010,7 +1008,6 @@ html.dark .wear--bs {
   transition: all 200ms ease;
 }
 
-/* 普通平台标签 - 透明底 + 细边框 */
 .item-hero__platform-tag.platform-tag--normal {
   background: transparent !important;
   border: 1px solid rgba(0, 0, 0, 0.12) !important;
@@ -1022,12 +1019,11 @@ html.dark .item-hero__platform-tag.platform-tag--normal {
   color: #94a3b8 !important;
 }
 
-/* 最高价标签 - 科技脉搏特效 */
 .item-hero__platform-tag.platform-tag--highest {
   background: rgba(239, 68, 68, 0.06) !important;
   border: 1px solid rgba(239, 68, 68, 0.45) !important;
   color: #dc2626 !important;
-  animation: highest-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: none;
   position: relative;
   padding-left: 1.5rem !important;
 }
@@ -1038,7 +1034,6 @@ html.dark .item-hero__platform-tag.platform-tag--highest {
   border-color: rgba(239, 68, 68, 0.5) !important;
 }
 
-/* LED 指示点 */
 .platform-tag--highest .platform-tag__content::before {
   content: '';
   position: absolute;
@@ -1050,36 +1045,12 @@ html.dark .item-hero__platform-tag.platform-tag--highest {
   border-radius: 50%;
   background: #ef4444;
   box-shadow: 0 0 6px 1px rgba(239, 68, 68, 0.7);
-  animation: led-blink 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: none;
 }
 
 html.dark .platform-tag--highest .platform-tag__content::before {
   background: #f87171;
   box-shadow: 0 0 8px 2px rgba(248, 113, 113, 0.6);
-}
-
-/* 呼吸光晕动画 */
-@keyframes highest-pulse {
-  0%, 100% {
-    box-shadow: 0 0 4px rgba(239, 68, 68, 0.12),
-                inset 0 0 4px rgba(239, 68, 68, 0.03);
-  }
-  50% {
-    box-shadow: 0 0 12px rgba(239, 68, 68, 0.25),
-                inset 0 0 8px rgba(239, 68, 68, 0.08);
-  }
-}
-
-/* LED 微闪动画 */
-@keyframes led-blink {
-  0%, 100% {
-    opacity: 0.5;
-    transform: translateY(-50%) scale(0.9);
-  }
-  50% {
-    opacity: 1;
-    transform: translateY(-50%) scale(1.15);
-  }
 }
 
 .item-hero__right {
@@ -1089,8 +1060,8 @@ html.dark .platform-tag--highest .platform-tag__content::before {
   gap: 0.5rem;
 }
 .item-hero__price {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 900;
   line-height: 1;
   color: var(--n-text-color-1);
 }
@@ -1112,10 +1083,16 @@ html.dark .item-hero__badge {
 
 .trend-bar {
   margin-bottom: 1rem;
+  border: 1px solid var(--cs-border);
+  border-radius: 0.5rem;
+  background: var(--cs-bg-glass);
 }
 
 .chart-controls {
   margin-bottom: 0.5rem;
+  border: 1px solid var(--cs-border);
+  border-radius: 0.5rem;
+  background: var(--cs-bg-glass);
 }
 .chart-controls__row {
   display: flex;
@@ -1126,6 +1103,9 @@ html.dark .item-hero__badge {
 
 .chart-card {
   overflow: hidden;
+  border: 1px solid var(--cs-border);
+  border-radius: 0.5rem;
+  background: var(--cs-bg-glass);
 }
 .chart-container {
   width: 100%;

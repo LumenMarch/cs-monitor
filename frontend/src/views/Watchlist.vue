@@ -4,9 +4,29 @@
     <div class="watchlist__header">
       <div>
         <h2 class="watchlist__title">监控清单</h2>
-        <p class="watchlist__desc">当前正在进行价格追踪的 {{ store.items.length }} 个饰品项。</p>
+        <p class="watchlist__desc">SkinRadar 正在扫描 {{ store.items.length }} 个饰品项，优先展示平台价格、波动与状态。</p>
       </div>
       <div class="watchlist__header-actions">
+        <div class="watchlist__view-toggle" aria-label="切换视图">
+          <button
+            type="button"
+            :class="{ 'watchlist__view-btn--active': viewMode === 'table' }"
+            class="watchlist__view-btn"
+            title="表格视图"
+            @click="viewMode = 'table'"
+          >
+            <Table2 class="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            :class="{ 'watchlist__view-btn--active': viewMode === 'card' }"
+            class="watchlist__view-btn"
+            title="卡片视图"
+            @click="viewMode = 'card'"
+          >
+            <LayoutGrid class="w-4 h-4" />
+          </button>
+        </div>
         <button
           class="watchlist__refresh-btn"
           :disabled="refreshing || cooldownSec > 0"
@@ -24,7 +44,7 @@
 
     <!-- 空态 -->
     <div v-if="!store.loading && !store.items.length" class="watchlist__empty">
-      <div class="watchlist__empty-icon">📋</div>
+      <Scan class="watchlist__empty-icon" />
       <h3 class="watchlist__empty-title">{{ t('watchlist.emptyTitle') }}</h3>
       <p class="watchlist__empty-desc">{{ t('watchlist.emptyDesc') }}</p>
       <button class="watchlist__add-btn" @click="openCreateModal">
@@ -52,6 +72,95 @@
           <div class="skeleton-line" style="width: 4rem; height: 1.5rem; border-radius: 0.25rem;" />
         </div>
       </div>
+    </div>
+
+    <!-- 表格扫盘 -->
+    <div v-else-if="viewMode === 'table'" class="terminal-table-wrap watchlist__table-wrap">
+      <table class="terminal-table watchlist__table">
+        <thead>
+          <tr>
+            <th>饰品</th>
+            <th>平台价格</th>
+            <th>前日收盘</th>
+            <th>24h</th>
+            <th>阈值</th>
+            <th>状态</th>
+            <th>走势</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="item in sortedItems"
+            :key="item.market_hash_name"
+            :class="{ 'watchlist__row--disabled': !item.enabled }"
+            @click="goToDetail(item)"
+          >
+            <td>
+              <div class="watchlist__item-cell">
+                <SteamItemImage
+                  :market-hash-name="item.market_hash_name"
+                  :icon-url="item.icon_url"
+                  :alt="item.display_name || item.market_hash_name"
+                  class-name="watchlist__table-img"
+                  :fallback-emoji="getWeaponEmoji(item.market_hash_name)"
+                />
+                <div>
+                  <strong>{{ item.display_name || item.market_hash_name }}</strong>
+                  <span>{{ item.market_hash_name }}</span>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="watchlist__platform-strip">
+                <span
+                  v-for="p in item.platform_prices.filter((pp: any) => pp.price > 0).slice(0, 3)"
+                  :key="p.platform"
+                  class="watchlist__platform-chip"
+                >
+                  {{ p.platform }} <b class="font-mono-num">¥{{ p.price.toFixed(0) }}</b>
+                </span>
+                <span v-if="!item.platform_prices?.length" class="watchlist__muted">—</span>
+              </div>
+            </td>
+            <td class="font-mono-num">¥{{ displayPrice(item) }}</td>
+            <td>
+              <span
+                v-if="item.change_24h != null"
+                class="watchlist__change-pill font-mono-num"
+                :class="item.change_24h >= 0 ? 'watchlist__change-pill--up' : 'watchlist__change-pill--down'"
+              >
+                {{ item.change_24h >= 0 ? '+' : '' }}{{ item.change_24h.toFixed(2) }}%
+              </span>
+              <span v-else class="watchlist__muted">—</span>
+            </td>
+            <td class="font-mono-num">{{ item.threshold_percent.toFixed(1) }}%</td>
+            <td>
+              <span class="watchlist__status" :class="item.enabled ? 'watchlist__status--on' : 'watchlist__status--off'">
+                {{ item.enabled ? '扫描中' : '已暂停' }}
+              </span>
+            </td>
+            <td>
+              <MiniSparkline
+                v-if="item.sparkline?.length >= 2"
+                :data="item.sparkline"
+                :color="sparklineColor(item)"
+                :width="110"
+                :height="28"
+              />
+              <span v-else class="watchlist__muted">—</span>
+            </td>
+            <td @click.stop>
+              <div class="watchlist__table-actions">
+                <button class="watchlist-card__action-btn" @click="handleToggle(item)">
+                  {{ item.enabled ? '暂停' : '启用' }}
+                </button>
+                <button class="watchlist-card__action-btn watchlist-card__action-btn--primary" @click="openEditModal(item)">编辑</button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- 卡片网格 -->
@@ -260,7 +369,7 @@ import {
   useMessage,
 } from 'naive-ui'
 import type { FormRules, FormInst } from 'naive-ui'
-import { Scan, ArrowUpRight, ArrowDownRight, Zap } from 'lucide-vue-next'
+import { Scan, ArrowUpRight, ArrowDownRight, Zap, LayoutGrid, Table2 } from 'lucide-vue-next'
 import { useWatchlistStore } from '@/stores/watchlist'
 import api from '@/api'
 import type { WatchlistItemWithPrice } from '@/api'
@@ -275,6 +384,7 @@ const store = useWatchlistStore()
 const message = useMessage()
 const { colorUp, colorDown } = useTheme()
 const { t } = useI18n()
+const viewMode = ref<'table' | 'card'>('table')
 
 // 将 hex 颜色转为 RGB 字符串，用于 CSS rgba() 背景
 function hexToRgb(hex: string): string {
@@ -286,6 +396,15 @@ function hexToRgb(hex: string): string {
 }
 const colorUpRgb = computed(() => hexToRgb(colorUp.value))
 const colorDownRgb = computed(() => hexToRgb(colorDown.value))
+
+const sortedItems = computed(() => {
+  return [...store.items].sort((a, b) => {
+    const aEnabled = a.enabled ? 1 : 0
+    const bEnabled = b.enabled ? 1 : 0
+    if (aEnabled !== bEnabled) return bEnabled - aEnabled
+    return Math.abs(b.change_24h ?? 0) - Math.abs(a.change_24h ?? 0)
+  })
+})
 
 const modalVisible = ref(false)
 const deleteModalVisible = ref(false)
@@ -534,11 +653,11 @@ function sparklineColor(item: WatchlistItemWithPrice): string {
   return '#3b82f6'
 }
 
-// 武器类型 emoji 映射
+// 武器类型文本回退
 function getWeaponEmoji(name: string): string {
   const n = name.toLowerCase()
-  if (n.includes('knife') || n.includes('karambit') || n.includes('bayonet') || n.includes('butterfly')) return '🗡️'
-  if (n.includes('glove')) return '🧤'
+  if (n.includes('knife') || n.includes('karambit') || n.includes('bayonet') || n.includes('butterfly')) return 'KN'
+  if (n.includes('glove')) return 'GL'
   if (n.includes('ak-47')) return 'AK'
   if (n.includes('awp')) return 'AWP'
   if (n.includes('m4a4') || n.includes('m4a1')) return 'M4'
@@ -571,12 +690,12 @@ function getWeaponEmoji(name: string): string {
   if (n.includes('cz75')) return 'CZ'
   if (n.includes('dual')) return 'D'
   if (n.includes('revolver')) return 'R'
-  if (n.includes('sticker')) return '🏷️'
-  if (n.includes('case') || n.includes('capsule')) return '📦'
-  if (n.includes('agent')) return '👤'
-  if (n.includes('patch')) return '🔖'
-  if (n.includes('music')) return '🎵'
-  return '🔫'
+  if (n.includes('sticker')) return 'ST'
+  if (n.includes('case') || n.includes('capsule')) return 'BX'
+  if (n.includes('agent')) return 'AG'
+  if (n.includes('patch')) return 'PT'
+  if (n.includes('music')) return 'MS'
+  return 'CS'
 }
 
 onMounted(() => {
@@ -635,6 +754,137 @@ watch(
   display: flex;
   gap: 0.75rem;
   align-items: center;
+}
+
+.watchlist__view-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--cs-border);
+  border-radius: 0.5rem;
+  background: var(--cs-bg-glass);
+}
+
+.watchlist__view-btn {
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--cs-text-muted);
+  cursor: pointer;
+}
+
+.watchlist__view-btn:hover,
+.watchlist__view-btn--active {
+  background: rgba(99, 102, 241, 0.14);
+  color: var(--cs-brand-primary-hover);
+}
+
+.watchlist__table-wrap {
+  max-width: 100%;
+}
+
+.watchlist__table tbody tr {
+  cursor: pointer;
+}
+
+.watchlist__row--disabled {
+  opacity: 0.58;
+}
+
+.watchlist__item-cell {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(12rem, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.watchlist__item-cell strong,
+.watchlist__item-cell span {
+  display: block;
+}
+
+.watchlist__item-cell strong {
+  max-width: 24rem;
+  overflow: hidden;
+  color: var(--cs-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist__item-cell span {
+  max-width: 24rem;
+  overflow: hidden;
+  color: var(--cs-text-muted);
+  font-size: 0.6875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:deep(.watchlist__table-img) {
+  width: 2.25rem;
+  height: 2.25rem;
+  object-fit: contain;
+}
+
+.watchlist__platform-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.watchlist__platform-chip,
+.watchlist__status,
+.watchlist__change-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.watchlist__platform-chip {
+  color: var(--cs-brand-primary-hover);
+  border: 1px solid rgba(99, 102, 241, 0.24);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.watchlist__status--on {
+  color: var(--cs-radar);
+  border: 1px solid rgba(34, 197, 94, 0.24);
+  background: rgba(34, 197, 94, 0.09);
+}
+
+.watchlist__status--off {
+  color: var(--cs-text-muted);
+  border: 1px solid var(--cs-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.watchlist__change-pill--up {
+  color: var(--color-up, #ef4444);
+  background: rgba(v-bind(colorUpRgb), 0.1);
+}
+
+.watchlist__change-pill--down {
+  color: var(--color-down, #22c55e);
+  background: rgba(v-bind(colorDownRgb), 0.1);
+}
+
+.watchlist__muted {
+  color: var(--cs-text-muted);
+}
+
+.watchlist__table-actions {
+  display: flex;
+  gap: 0.375rem;
 }
 
 .watchlist__refresh-btn {

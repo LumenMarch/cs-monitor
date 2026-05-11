@@ -45,7 +45,7 @@ html, body, #app {
 }
 
 body {
-  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family: 'Aptos', 'PingFang SC', 'Microsoft YaHei', 'HarmonyOS Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--cs-bg-page);
@@ -57,5 +57,6 @@ body {
 .font-mono-num {
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 </style>

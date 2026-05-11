@@ -3,14 +3,32 @@
     <!-- 标题区 -->
     <div class="extreme-track__header">
       <div>
-        <h2 class="extreme-track__title">极致追踪模式</h2>
-        <p class="extreme-track__desc">高频轮询模式，针对极稀有饰品进行毫秒级价格监控。</p>
+        <h2 class="extreme-track__title">高频追踪雷达</h2>
+        <p class="extreme-track__desc">为稀有目标配置高频轮询、价格异常与数量突增捕获任务。</p>
       </div>
       <button class="btn-primary text-xs h-9 px-4" @click="openCreateModal">
         <Plus class="w-4 h-4" />
         添加追踪
       </button>
     </div>
+
+    <section class="metric-strip">
+      <div class="metric-cell">
+        <span class="metric-cell__label">Radar Tasks</span>
+        <span class="metric-cell__value">{{ store.items.length }}</span>
+        <span class="metric-cell__sub">追踪配置总数</span>
+      </div>
+      <div class="metric-cell">
+        <span class="metric-cell__label">Running</span>
+        <span class="metric-cell__value extreme-track__metric-on">{{ runningCount }}</span>
+        <span class="metric-cell__sub">实时轮询中</span>
+      </div>
+      <div class="metric-cell">
+        <span class="metric-cell__label">Avg Interval</span>
+        <span class="metric-cell__value">{{ avgInterval }}s</span>
+        <span class="metric-cell__sub">平均轮询间隔</span>
+      </div>
+    </section>
 
     <!-- 骨架屏 -->
     <div v-if="store.loading" class="extreme-track__grid">
@@ -356,7 +374,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   NButton,
@@ -426,11 +444,18 @@ function intensityPercent(item: ExtremeTrackConfig): number {
   return Math.max(10, 100 - (item.interval_seconds / 2))
 }
 
-// 武器类型 emoji 映射
+const runningCount = computed(() => store.items.filter((item) => item.enabled).length)
+const avgInterval = computed(() => {
+  if (!store.items.length) return 0
+  const total = store.items.reduce((sum, item) => sum + item.interval_seconds, 0)
+  return Math.round(total / store.items.length)
+})
+
+// 武器类型文本回退
 function getWeaponEmoji(name: string): string {
   const n = name.toLowerCase()
-  if (n.includes('knife') || n.includes('karambit') || n.includes('bayonet') || n.includes('butterfly')) return '🗡️'
-  if (n.includes('glove')) return '🧤'
+  if (n.includes('knife') || n.includes('karambit') || n.includes('bayonet') || n.includes('butterfly')) return 'KN'
+  if (n.includes('glove')) return 'GL'
   if (n.includes('ak-47')) return 'AK'
   if (n.includes('awp')) return 'AWP'
   if (n.includes('m4a4') || n.includes('m4a1')) return 'M4'
@@ -463,12 +488,12 @@ function getWeaponEmoji(name: string): string {
   if (n.includes('cz75')) return 'CZ'
   if (n.includes('dual')) return 'D'
   if (n.includes('revolver')) return 'R'
-  if (n.includes('sticker')) return '🏷️'
-  if (n.includes('case') || n.includes('capsule')) return '📦'
-  if (n.includes('agent')) return '👤'
-  if (n.includes('patch')) return '🔖'
-  if (n.includes('music')) return '🎵'
-  return '🔫'
+  if (n.includes('sticker')) return 'ST'
+  if (n.includes('case') || n.includes('capsule')) return 'BX'
+  if (n.includes('agent')) return 'AG'
+  if (n.includes('patch')) return 'PT'
+  if (n.includes('music')) return 'MS'
+  return 'CS'
 }
 
 const modalVisible = ref(false)
@@ -759,6 +784,10 @@ onBeforeUnmount(() => {
   font-weight: 500;
   font-size: 0.875rem;
   margin: 0.25rem 0 0 0;
+}
+
+.extreme-track__metric-on {
+  color: var(--cs-radar);
 }
 
 /* ===== 网格 ===== */
