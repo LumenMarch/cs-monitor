@@ -8,7 +8,7 @@
   <aside
     v-if="!isMobile || mobileDrawerOpen"
     class="sidebar"
-    :class="{ 'sidebar--mobile': isMobile }"
+    :class="{ 'sidebar--mobile': isMobile, 'sidebar--collapsed': collapsed && !isMobile }"
   >
     <SidebarContent
       :collapsed="collapsed"
@@ -33,7 +33,7 @@ defineEmits<{
 
 <style scoped>
 .sidebar {
-  width: 5rem;
+  width: 16rem;
   height: 100vh;
   flex-shrink: 0;
   border-right: 1px solid #1f1f23;
@@ -46,10 +46,8 @@ defineEmits<{
   transition: all 300ms;
 }
 
-@media (min-width: 1024px) {
-  .sidebar {
-    width: 16rem;
-  }
+.sidebar--collapsed {
+  width: 5rem;
 }
 
 .sidebar--mobile {

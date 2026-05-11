@@ -947,7 +947,7 @@ html.dark .item-hero {
   font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   word-break: break-word;
 }
 .item-hero__wear {

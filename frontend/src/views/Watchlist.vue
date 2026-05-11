@@ -68,9 +68,6 @@
           <div class="watchlist-card__scan-icon">
             <Scan class="w-4 h-4" />
           </div>
-          <button class="watchlist-card__more" @click.stop aria-label="更多操作">
-            <MoreHorizontal class="w-5 h-5" />
-          </button>
         </div>
 
         <!-- 图片区 -->
@@ -249,8 +246,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   NButton,
   NSpace,
@@ -263,7 +260,7 @@ import {
   useMessage,
 } from 'naive-ui'
 import type { FormRules, FormInst } from 'naive-ui'
-import { Scan, MoreHorizontal, ArrowUpRight, ArrowDownRight, Zap } from 'lucide-vue-next'
+import { Scan, ArrowUpRight, ArrowDownRight, Zap } from 'lucide-vue-next'
 import { useWatchlistStore } from '@/stores/watchlist'
 import api from '@/api'
 import type { WatchlistItemWithPrice } from '@/api'
@@ -273,6 +270,7 @@ import { useTheme } from '@/composables/useTheme'
 import { useI18n } from 'vue-i18n'
 
 const router = useRouter()
+const route = useRoute()
 const store = useWatchlistStore()
 const message = useMessage()
 const { colorUp, colorDown } = useTheme()
@@ -517,7 +515,7 @@ async function handleToggle(item: WatchlistItemWithPrice) {
 function goToDetail(item: WatchlistItemWithPrice) {
   router.push({
     name: 'ItemDetail',
-    params: { name: encodeURIComponent(item.market_hash_name) },
+    params: { name: item.market_hash_name },
   })
 }
 
@@ -584,6 +582,18 @@ function getWeaponEmoji(name: string): string {
 onMounted(() => {
   store.fetchItems()
 })
+
+watch(
+  () => route.query.action,
+  (action) => {
+    if (action !== 'add') return
+    openCreateModal()
+    const query = { ...route.query }
+    delete query.action
+    router.replace({ name: 'Watchlist', query })
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
@@ -609,7 +619,7 @@ onMounted(() => {
   font-size: 1.75rem;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: #ffffff;
   margin: 0;
 }
@@ -759,21 +769,6 @@ onMounted(() => {
 
 .watchlist-card:hover .watchlist-card__scan-icon {
   opacity: 1;
-}
-
-.watchlist-card__more {
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  cursor: pointer;
-  padding: 0.25rem;
-  transition: color 200ms;
-  display: flex;
-  align-items: center;
-}
-
-.watchlist-card__more:hover {
-  color: #ffffff;
 }
 
 /* ─── 图片区 ─── */
@@ -1083,14 +1078,6 @@ html:not(.dark) .watchlist-card__scan-icon {
   background: rgba(0, 0, 0, 0.03);
   border-color: rgba(0, 0, 0, 0.06);
   color: #94a3b8;
-}
-
-html:not(.dark) .watchlist-card__more {
-  color: #94a3b8;
-}
-
-html:not(.dark) .watchlist-card__more:hover {
-  color: #0f172a;
 }
 
 html:not(.dark) .watchlist-card__image {

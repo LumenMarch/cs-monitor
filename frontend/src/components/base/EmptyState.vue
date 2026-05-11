@@ -73,7 +73,7 @@ withDefaults(defineProps<{
   font-weight: 600;
   margin-bottom: 0.375rem;
   color: var(--cs-text-primary);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .empty-state__desc {

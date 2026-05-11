@@ -245,7 +245,7 @@ onMounted(() => {
 .uc__header h2.uc__title {
   font-size: 1.75rem;
   font-weight: 900;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: #ffffff;
   margin: 0;
 }

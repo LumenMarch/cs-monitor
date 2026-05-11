@@ -1,5 +1,6 @@
 <template>
   <div class="app-layout">
+    <a class="app-layout__skip-link" href="#main-content">跳到主内容</a>
     <Sidebar
       :collapsed="collapsed"
       :is-mobile="isMobile"
@@ -15,7 +16,7 @@
         @toggle-collapse="toggleCollapse"
         @toggle-mobile-drawer="mobileDrawerOpen = !mobileDrawerOpen"
       />
-      <main class="app-layout__content scrollbar-hide">
+      <main id="main-content" class="app-layout__content scrollbar-hide" tabindex="-1">
         <router-view v-slot="{ Component, route: viewRoute }">
           <transition name="page" mode="out-in">
             <component :is="Component" :key="viewRoute.path" />
@@ -71,6 +72,27 @@ onUnmounted(() => {
   color: #ffffff;
 }
 
+.app-layout__skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 2000;
+  transform: translateY(-180%);
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  background: #6366f1;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 160ms;
+}
+
+.app-layout__skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
 .app-layout__main {
   flex: 1;
   display: flex;
@@ -120,6 +142,10 @@ onUnmounted(() => {
   z-index: 1;
 }
 
+.app-layout__content:focus {
+  outline: none;
+}
+
 /* 页面过渡动画 */
 .page-enter-active,
 .page-leave-active {
@@ -140,5 +166,11 @@ onUnmounted(() => {
 html:not(.dark) .app-layout {
   background: #f8fafc;
   color: #0f172a;
+}
+
+@media (max-width: 640px) {
+  .app-layout__content {
+    padding: 1.25rem 1rem;
+  }
 }
 </style>

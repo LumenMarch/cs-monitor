@@ -356,7 +356,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   NButton,
   NSpace,
@@ -382,6 +383,8 @@ import { useTheme } from '@/composables/useTheme'
 
 const store = useExtremeTrackStore()
 const message = useMessage()
+const route = useRoute()
+const router = useRouter()
 useTheme()
 
 // 实时快照数据 { "marketHashName@platform": { price, quantity, recorded_at } }
@@ -708,6 +711,18 @@ onMounted(() => {
   })
 })
 
+watch(
+  () => route.query.action,
+  (action) => {
+    if (action !== 'add') return
+    openCreateModal()
+    const query = { ...route.query }
+    delete query.action
+    router.replace({ name: 'ExtremeTrack', query })
+  },
+  { immediate: true },
+)
+
 onBeforeUnmount(() => {
   stopPolling()
 })
@@ -734,7 +749,7 @@ onBeforeUnmount(() => {
   font-size: 1.75rem;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: #ffffff;
   margin: 0;
 }
@@ -1101,7 +1116,7 @@ onBeforeUnmount(() => {
   font-size: 1.25rem;
   font-weight: 900;
   color: #22c55e;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .track-card__snapshot-qty {

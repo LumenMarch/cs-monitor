@@ -1,12 +1,12 @@
 <template>
-  <div class="sidebar-content">
+  <div class="sidebar-content" :class="{ 'sidebar-content--collapsed': collapsed }">
     <!-- Logo 区 -->
     <div class="sidebar-header">
       <div class="sidebar-logo">
         <div class="sidebar-logo__icon">
           <Scan class="w-5 h-5 text-white" />
         </div>
-        <div class="sidebar-logo__text sidebar-logo__text--desktop">
+        <div class="sidebar-logo__text">
           <h1 class="sidebar-logo__title">CS<span class="text-brand">MONITOR</span></h1>
           <p class="sidebar-logo__subtitle">Trading Terminal</p>
         </div>
@@ -19,21 +19,23 @@
         v-for="item in menuItems"
         :key="item.id"
         :class="activeKey === item.id ? 'nav-item-active' : 'nav-item'"
+        :aria-label="item.label"
+        type="button"
         @click="navigate(item.id)"
       >
         <component :is="item.icon" class="w-5 h-5 shrink-0" />
-        <span class="sidebar-nav__label sidebar-nav__label--desktop">{{ item.label }}</span>
+        <span class="sidebar-nav__label">{{ item.label }}</span>
       </button>
     </nav>
 
     <!-- 底部区域 -->
     <div class="sidebar-footer">
-      <button class="nav-item sidebar-help-btn">
+      <button class="nav-item sidebar-help-btn" type="button" aria-label="帮助中心">
         <HelpCircle class="w-5 h-5 shrink-0" />
-        <span class="sidebar-nav__label sidebar-nav__label--desktop">帮助中心</span>
+        <span class="sidebar-nav__label">帮助中心</span>
       </button>
       <div class="sidebar-divider" />
-      <div class="sidebar-status sidebar-status--desktop">
+      <div class="sidebar-status">
         <div class="sidebar-status__label">服务状态</div>
         <div class="sidebar-status__row">
           <div class="sidebar-status__dot" />
@@ -66,6 +68,10 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const emit = defineEmits<{ (e: 'navigate'): void }>()
+
+defineProps<{
+  collapsed: boolean
+}>()
 
 const activeKey = computed(() => route.name as string)
 
@@ -123,20 +129,10 @@ function navigate(name: string) {
   box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
 }
 
-.sidebar-logo__text--desktop {
-  display: none;
-}
-
-@media (min-width: 1024px) {
-  .sidebar-logo__text--desktop {
-    display: block;
-  }
-}
-
 .sidebar-logo__title {
   font-size: 0.875rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: #ffffff;
   margin: 0;
 }
@@ -162,16 +158,6 @@ function navigate(name: string) {
   gap: 0.5rem;
 }
 
-.sidebar-nav__label--desktop {
-  display: none;
-}
-
-@media (min-width: 1024px) {
-  .sidebar-nav__label--desktop {
-    display: block;
-  }
-}
-
 .sidebar-footer {
   padding: 1rem;
   display: flex;
@@ -189,18 +175,30 @@ function navigate(name: string) {
   margin: 0 0.5rem;
 }
 
-.sidebar-status--desktop {
+.sidebar-status {
+  padding: 1rem 0.75rem;
+}
+
+.sidebar-content--collapsed .sidebar-logo__text,
+.sidebar-content--collapsed .sidebar-nav__label,
+.sidebar-content--collapsed .sidebar-status,
+.sidebar-content--collapsed .sidebar-divider {
   display: none;
 }
 
-@media (min-width: 1024px) {
-  .sidebar-status--desktop {
-    display: block;
-  }
+.sidebar-content--collapsed .sidebar-header {
+  justify-content: center;
+  padding: 0;
 }
 
-.sidebar-status {
-  padding: 1rem 0.75rem;
+.sidebar-content--collapsed .sidebar-nav {
+  padding-inline: 0.75rem;
+}
+
+.sidebar-content--collapsed :global(.nav-item),
+.sidebar-content--collapsed :global(.nav-item-active) {
+  justify-content: center;
+  padding-inline: 0;
 }
 
 .sidebar-status__label {

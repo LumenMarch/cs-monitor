@@ -162,7 +162,7 @@ html:not(.dark) .login {
 .login__title {
   font-size: 1.5rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: #ffffff;
   margin: 0;
 }

@@ -1,26 +1,82 @@
 <template>
   <header class="topbar">
     <div class="topbar-left">
+      <button
+        v-if="isMobile"
+        class="topbar-icon-btn"
+        type="button"
+        aria-label="打开导航菜单"
+        title="打开导航菜单"
+        @click="emit('toggle-mobile-drawer')"
+      >
+        <Menu class="w-5 h-5" />
+      </button>
+      <button
+        v-else
+        class="topbar-icon-btn topbar-collapse-btn"
+        type="button"
+        :aria-label="collapsed ? '展开侧边栏' : '收起侧边栏'"
+        :title="collapsed ? '展开侧边栏' : '收起侧边栏'"
+        @click="emit('toggle-collapse')"
+      >
+        <PanelLeftOpen v-if="collapsed" class="w-5 h-5" />
+        <PanelLeftClose v-else class="w-5 h-5" />
+      </button>
       <h2 class="topbar-title">{{ viewTitle }}</h2>
       <div class="topbar-divider" />
       <div class="topbar-search">
         <Search class="topbar-search__icon" />
         <input
+          v-model="searchQuery"
           type="text"
           :placeholder="searchPlaceholder"
           class="topbar-search__input"
+          autocomplete="off"
+          aria-label="搜索饰品"
+          @focus="handleSearchFocus"
+          @input="handleSearchInput"
+          @keydown.enter.prevent="goToFirstSearchResult"
+          @keydown.esc="closeSearch"
+          @blur="handleSearchBlur"
         />
+        <div
+          v-if="searchPanelVisible"
+          class="topbar-search__panel"
+          role="listbox"
+        >
+          <button
+            v-for="item in searchResults"
+            :key="item.market_hash_name"
+            class="topbar-search__item"
+            type="button"
+            role="option"
+            @mousedown.prevent="goToItem(item.market_hash_name)"
+          >
+            <span class="topbar-search__item-name">{{ item.name || item.market_hash_name }}</span>
+            <span
+              v-if="item.name && item.name !== item.market_hash_name"
+              class="topbar-search__item-alias"
+            >
+              {{ item.market_hash_name }}
+            </span>
+          </button>
+          <div v-if="searching" class="topbar-search__state">搜索中...</div>
+          <div v-else-if="searchQuery.trim() && !searchResults.length" class="topbar-search__state">
+            未找到匹配饰品
+          </div>
+        </div>
       </div>
     </div>
     <div class="topbar-right">
-      <button class="topbar-icon-btn" title="刷新数据" @click="handleRefresh">
+      <button class="topbar-icon-btn" type="button" title="刷新数据" aria-label="刷新数据" @click="handleRefresh">
         <RefreshCw class="w-5 h-5" />
       </button>
       <template v-for="action in contextActions" :key="action.id">
         <button
           :class="action.primary ? 'btn-primary' : 'btn-outline'"
           :style="action.style"
-          class="text-xs h-10 px-4"
+          class="topbar-action text-xs h-10 px-4"
+          type="button"
           @click="action.handler"
         >
           <component :is="action.icon" v-if="action.icon" class="w-4 h-4" />
@@ -35,7 +91,7 @@
         :options="userMenuOptions"
         @select="onUserMenuSelect"
       >
-        <button class="topbar-user" title="账号菜单">
+        <button class="topbar-user" type="button" title="账号菜单" aria-label="账号菜单">
           <div class="topbar-user__avatar">
             {{ avatarLetter }}
           </div>
@@ -47,17 +103,27 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h } from 'vue'
+import { computed, h, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Search, RefreshCw, Activity, Upload, Plus, Zap, Download, Save,
-  UserCog, Users as UsersIcon, LogOut,
+  Search,
+  RefreshCw,
+  Activity,
+  Plus,
+  Zap,
+  UserCog,
+  Users as UsersIcon,
+  LogOut,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-vue-next'
 import { NDropdown } from 'naive-ui'
 import { useDashboardStore } from '@/stores/dashboard'
 import { useWatchlistStore } from '@/stores/watchlist'
 import { useAuthStore } from '@/stores/auth'
-import { toastSuccess } from '@/composables/useToast'
+import { toastError, toastSuccess, toastWarning } from '@/composables/useToast'
+import api, { type SearchItemResult } from '@/api'
 
 const auth = useAuthStore()
 
@@ -109,7 +175,7 @@ defineProps<{
   isMobile: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'toggle-collapse'): void
   (e: 'toggle-mobile-drawer'): void
 }>()
@@ -118,6 +184,11 @@ const route = useRoute()
 const router = useRouter()
 const dashboardStore = useDashboardStore()
 const watchlistStore = useWatchlistStore()
+const searchQuery = ref('')
+const searchResults = ref<SearchItemResult[]>([])
+const searching = ref(false)
+const searchFocused = ref(false)
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const viewTitle = computed(() => {
   const map: Record<string, string> = {
@@ -135,16 +206,17 @@ const viewTitle = computed(() => {
 })
 
 const searchPlaceholder = computed(() => {
-  const name = route.name as string
-  if (name === 'Alerts') return '在历史告警中搜索 (如: AK-47)...'
-  if (name === 'Settings') return '搜索系统配置项...'
   return '快速搜索饰品名称...'
 })
+
+const searchPanelVisible = computed(() =>
+  searchFocused.value && (!!searchQuery.value.trim() || searching.value),
+)
 
 interface ContextAction {
   id: string
   label: string
-  icon?: typeof Activity
+  icon?: Component
   primary: boolean
   handler: () => void
   style?: string
@@ -155,26 +227,17 @@ const contextActions = computed<ContextAction[]>(() => {
   switch (name) {
     case 'Dashboard':
       return [
-        { id: 'status', label: '服务状态', icon: Activity, primary: false, handler: () => {} },
+        { id: 'status', label: '服务状态', icon: Activity, primary: false, handler: handleStatusCheck },
         { id: 'sync', label: '强制同步', icon: RefreshCw, primary: true, handler: handleForceSync },
       ]
     case 'Watchlist':
       return [
-        { id: 'import', label: '批量导入', icon: Upload, primary: false, handler: () => {} },
         { id: 'add', label: '新增监控项', icon: Plus, primary: true, handler: () => router.push({ name: 'Watchlist', query: { action: 'add' } }) },
       ]
     case 'ExtremeTrack':
       return [
-        { id: 'speed', label: 'API 测速', primary: false, handler: () => {}, style: 'color: #22c55e; border-color: rgba(34,197,94,0.3)' },
-        { id: 'start', label: '启动新任务', icon: Zap, primary: true, handler: () => {}, style: 'background: #22c55e; color: #000; box-shadow: 0 4px 12px rgba(34,197,94,0.2)' },
-      ]
-    case 'Alerts':
-      return [
-        { id: 'export', label: '导出日志', icon: Download, primary: false, handler: () => {} },
-      ]
-    case 'Settings':
-      return [
-        { id: 'save', label: '保存全局配置', icon: Save, primary: true, handler: () => {} },
+        { id: 'speed', label: 'API 测速', icon: Activity, primary: false, handler: handleStatusCheck, style: 'color: #16a34a; border-color: rgba(34,197,94,0.3)' },
+        { id: 'start', label: '启动新任务', icon: Zap, primary: true, handler: () => router.push({ name: 'ExtremeTrack', query: { action: 'add' } }), style: 'background: #22c55e; color: #052e16; box-shadow: 0 4px 12px rgba(34,197,94,0.2)' },
       ]
     default:
       return []
@@ -186,10 +249,94 @@ function handleRefresh() {
   toastSuccess('数据刷新中...')
 }
 
-function handleForceSync() {
-  watchlistStore.refreshPrices()
-  toastSuccess('全量同步已触发')
+async function handleStatusCheck() {
+  const startedAt = performance.now()
+  try {
+    const { data } = await api.health()
+    const duration = Math.round(performance.now() - startedAt)
+    toastSuccess(`服务正常，延迟 ${duration}ms，数据库 ${data.database}`)
+  } catch {
+    toastError('服务状态检查失败')
+  }
 }
+
+async function handleForceSync() {
+  try {
+    const result = await watchlistStore.refreshPrices()
+    toastSuccess(`同步完成：成功 ${result.success} / 失败 ${result.failed}`)
+  } catch (e: unknown) {
+    const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+    toastError(detail || '全量同步失败')
+  }
+}
+
+function handleSearchFocus() {
+  searchFocused.value = true
+}
+
+function handleSearchBlur() {
+  setTimeout(() => {
+    searchFocused.value = false
+  }, 180)
+}
+
+function closeSearch() {
+  searchFocused.value = false
+  searchResults.value = []
+}
+
+function handleSearchInput() {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchResults.value = []
+
+  const q = searchQuery.value.trim()
+  if (!q) {
+    searching.value = false
+    return
+  }
+
+  searchTimer = setTimeout(async () => {
+    searching.value = true
+    try {
+      const { data } = await api.searchItems(q, 6)
+      searchResults.value = data
+    } catch {
+      searchResults.value = []
+    } finally {
+      searching.value = false
+    }
+  }, 250)
+}
+
+function goToFirstSearchResult() {
+  const first = searchResults.value[0]
+  if (!first) {
+    toastWarning('没有可跳转的搜索结果')
+    return
+  }
+  goToItem(first.market_hash_name)
+}
+
+function goToItem(marketHashName: string) {
+  searchQuery.value = ''
+  searchResults.value = []
+  searchFocused.value = false
+  router.push({
+    name: 'ItemDetail',
+    params: { name: marketHashName },
+  })
+}
+
+watch(
+  () => route.fullPath,
+  () => {
+    closeSearch()
+    if (searchTimer) {
+      clearTimeout(searchTimer)
+      searchTimer = null
+    }
+  },
+)
 </script>
 
 <style scoped>
@@ -205,12 +352,14 @@ function handleForceSync() {
   padding: 0 2rem;
   z-index: 40;
   flex-shrink: 0;
+  gap: 1rem;
 }
 
 .topbar-left {
   display: flex;
   align-items: center;
   gap: 1rem;
+  min-width: 0;
 }
 
 .topbar-title {
@@ -219,6 +368,7 @@ function handleForceSync() {
   color: #ffffff;
   text-transform: capitalize;
   margin: 0;
+  white-space: nowrap;
 }
 
 .topbar-divider {
@@ -229,6 +379,7 @@ function handleForceSync() {
 
 .topbar-search {
   position: relative;
+  z-index: 2;
 }
 
 .topbar-search__icon {
@@ -269,10 +420,66 @@ function handleForceSync() {
   color: #71717a;
 }
 
+.topbar-search__panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  width: min(26rem, calc(100vw - 2rem));
+  padding: 0.375rem;
+  border: 1px solid #1f1f23;
+  border-radius: 0.75rem;
+  background: rgba(15, 15, 18, 0.98);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.topbar-search__item {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.topbar-search__item:hover,
+.topbar-search__item:focus-visible {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.topbar-search__item-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.topbar-search__item-alias,
+.topbar-search__state {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  color: #94a3b8;
+}
+
+.topbar-search__state {
+  padding: 0.625rem 0.75rem;
+}
+
 .topbar-right {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  flex-shrink: 0;
 }
 
 .topbar-icon-btn {
@@ -291,6 +498,13 @@ function handleForceSync() {
 .topbar-icon-btn:hover {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.05);
+}
+
+.topbar-icon-btn:focus-visible,
+.topbar-user:focus-visible,
+.topbar-action:focus-visible {
+  outline: 2px solid var(--cs-border-focus);
+  outline-offset: 2px;
 }
 
 html:not(.dark) .topbar {
@@ -314,6 +528,21 @@ html:not(.dark) .topbar-search__input {
 
 html:not(.dark) .topbar-search__input:focus {
   border-color: rgba(99, 102, 241, 0.5);
+}
+
+html:not(.dark) .topbar-search__panel {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: #e2e8f0;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+}
+
+html:not(.dark) .topbar-search__item {
+  color: #0f172a;
+}
+
+html:not(.dark) .topbar-search__item:hover,
+html:not(.dark) .topbar-search__item:focus-visible {
+  background: rgba(99, 102, 241, 0.08);
 }
 
 html:not(.dark) .topbar-icon-btn {
@@ -377,5 +606,51 @@ html:not(.dark) .topbar-icon-btn:hover {
 
 html:not(.dark) .topbar-user {
   color: #1e293b;
+}
+
+@media (max-width: 1100px) {
+  .topbar-search__input:focus {
+    width: 14rem;
+  }
+}
+
+@media (max-width: 860px) {
+  .topbar {
+    padding: 0 1rem;
+  }
+
+  .topbar-search {
+    display: none;
+  }
+
+  .topbar-divider {
+    display: none;
+  }
+
+  .topbar-action {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    height: 4rem;
+  }
+
+  .topbar-title {
+    font-size: 1rem;
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .topbar-left,
+  .topbar-right {
+    gap: 0.5rem;
+  }
+
+  .topbar-icon-btn {
+    padding: 0.5rem;
+  }
 }
 </style>

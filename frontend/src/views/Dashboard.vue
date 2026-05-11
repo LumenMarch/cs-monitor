@@ -58,12 +58,15 @@
             </div>
           </div>
           <div class="dashboard__bars">
-            <div
-              v-for="(h, i) in barHeights"
-              :key="i"
-              class="dashboard__bar"
-              :style="{ height: animatedBars[i] ? `${h}%` : '0%', transitionDelay: `${i * 50}ms` }"
-            />
+            <template v-if="barHeights.length">
+              <div
+                v-for="(h, i) in barHeights"
+                :key="i"
+                class="dashboard__bar"
+                :style="{ height: animatedBars[i] ? `${h}%` : '0%', transitionDelay: `${i * 50}ms` }"
+              />
+            </template>
+            <div v-else class="dashboard__bars-empty">暂无趋势数据</div>
           </div>
         </div>
 
@@ -81,10 +84,6 @@
             <button class="btn-outline w-full justify-start text-xs py-2 h-9 px-3" @click="handleRefresh">
               <RefreshCw class="w-3 h-3" />
               全量刷新数据
-            </button>
-            <button class="btn-outline w-full justify-start text-xs py-2 h-9 px-3">
-              <Terminal class="w-3 h-3" />
-              查看运行日志
             </button>
           </div>
           <div class="dashboard__actions-footer">
@@ -120,23 +119,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Zap, LayoutGrid, RefreshCw, Terminal, Bell } from 'lucide-vue-next'
+import { computed, ref, onMounted } from 'vue'
+import { Zap, LayoutGrid, RefreshCw, Bell } from 'lucide-vue-next'
 import { useDashboardStore } from '@/stores/dashboard'
 import { toastSuccess } from '@/composables/useToast'
 import { formatUTCToLocal } from '@/utils/date'
 
 const dashboard = useDashboardStore()
 
-// 柱状图高度（伪数据，12 根柱子）
-const barHeights = [30, 50, 40, 60, 45, 70, 65, 80, 75, 95, 85, 100]
+const barHeights = computed(() => {
+  const values = dashboard.watchlistSparkline.filter((value) => Number.isFinite(value))
+  if (!values.length) return []
+
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  if (min === max) return values.map(() => 60)
+
+  return values.map((value) => Math.round(24 + ((value - min) / (max - min)) * 76))
+})
 const animatedBars = ref<boolean[]>(new Array(12).fill(false))
 
 onMounted(() => {
   dashboard.loadAll()
   // 延迟触发动画
   setTimeout(() => {
-    animatedBars.value = new Array(12).fill(true)
+    animatedBars.value = new Array(Math.max(barHeights.value.length, 12)).fill(true)
   }, 100)
 })
 
@@ -167,7 +174,7 @@ function handleRefresh() {
 .dashboard__title {
   font-size: 1.75rem;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: #ffffff;
   margin: 0;
 }
@@ -314,11 +321,17 @@ function handleRefresh() {
   background: rgba(99, 102, 241, 0.2);
   border-radius: 2px 2px 0 0;
   transition: height 800ms ease-out;
-  cursor: pointer;
 }
 
-.dashboard__bar:hover {
-  background: #6366f1;
+.dashboard__bars-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #71717a;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 /* ===== 右卡片 ===== */

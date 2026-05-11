@@ -22,7 +22,9 @@
               class="settings__token-input font-mono-num"
               readonly
             />
-            <button class="btn-outline px-6">配置令牌</button>
+            <button class="btn-outline px-6" type="button" @click="router.push({ name: 'UserCenter' })">
+              去个人中心
+            </button>
           </div>
         </div>
         <div class="settings__divider" />
@@ -31,9 +33,7 @@
             <div class="settings__toggle-title">数据库持久化 (SQLite)</div>
             <p class="settings__toggle-desc">启用后本地记录饰品历史价格数据。</p>
           </div>
-          <div class="settings__toggle settings__toggle--on">
-            <div class="settings__toggle-knob" />
-          </div>
+          <span class="settings__status-pill">已启用</span>
         </div>
       </div>
     </section>
@@ -56,7 +56,7 @@
           <p class="settings__notify-status">
             推送状态: {{ isTelegramConfigured ? '活跃' : '未启用' }}
           </p>
-          <button class="btn-outline w-full py-2" @click="handleTest('telegram')">测试通道</button>
+          <button class="btn-outline w-full py-2" type="button" :disabled="testing" @click="handleTest('telegram')">测试通道</button>
         </div>
         <div class="glass-card settings__notify-card">
           <div class="settings__notify-header">
@@ -69,7 +69,7 @@
           <p class="settings__notify-status">
             推送状态: {{ isWecomConfigured ? '活跃' : '未启用' }}
           </p>
-          <button class="btn-outline w-full py-2" @click="handleTest('wecom')">测试通道</button>
+          <button class="btn-outline w-full py-2" type="button" :disabled="testing" @click="handleTest('wecom')">测试通道</button>
         </div>
       </div>
     </section>
@@ -86,13 +86,16 @@
             <div class="settings__toggle-title">深色模式</div>
             <p class="settings__toggle-desc">启用暗色主题以减少眼部疲劳。</p>
           </div>
-          <div
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="isDark"
             class="settings__toggle"
             :class="{ 'settings__toggle--on': isDark }"
             @click="setTheme(isDark ? 'light' : 'dark')"
           >
             <div class="settings__toggle-knob" />
-          </div>
+          </button>
         </div>
         <div class="settings__divider" />
         <div class="settings__toggle-row">
@@ -100,9 +103,7 @@
             <div class="settings__toggle-title">等宽数字模式 (Tabular Nums)</div>
             <p class="settings__toggle-desc">饰品价格变动时，数字布局将保持绝对对齐。</p>
           </div>
-          <div class="settings__toggle settings__toggle--on">
-            <div class="settings__toggle-knob" />
-          </div>
+          <span class="settings__status-pill">已启用</span>
         </div>
       </div>
     </section>
@@ -115,9 +116,10 @@
       </div>
       <div class="glass-card settings__section-card">
         <div class="settings__rise-fall-selector">
-          <div
+          <button
             v-for="mode in riseFallModes"
             :key="mode.value"
+            type="button"
             class="settings__rise-fall-option"
             :class="{ 'settings__rise-fall-option--active': riseFallMode === mode.value }"
             @click="setRiseFall(mode.value)"
@@ -127,7 +129,7 @@
               <span :style="{ color: mode.downColor }">&#9660; -1.8%</span>
             </div>
             <div class="settings__rise-fall-label">{{ mode.label }}</div>
-          </div>
+          </button>
         </div>
       </div>
     </section>
@@ -150,7 +152,7 @@
           </div>
         </div>
         <div class="settings__data-actions">
-          <button class="btn-outline" @click="handleExportDb">
+          <button class="btn-outline" type="button" @click="handleExportDb">
             <Download class="w-4 h-4" />
             导出数据库
           </button>
@@ -161,7 +163,7 @@
             <AlertTriangle class="w-4 h-4" />
             危险操作
           </div>
-          <button class="settings__danger-btn" @click="showClearConfirm = true">
+          <button class="settings__danger-btn" type="button" @click="showClearConfirm = true">
             <Trash2 class="w-4 h-4" />
             清空所有监控数据
           </button>
@@ -195,6 +197,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   NInput,
   NModal,
@@ -230,6 +233,7 @@ const riseFallModes = [
 ]
 
 const message = useMessage()
+const router = useRouter()
 const { riseFallMode, isDark, setTheme, setRiseFall } = useTheme()
 const testing = ref(false)
 const clearing = ref(false)
@@ -346,7 +350,7 @@ onMounted(() => {
 .settings__title {
   font-size: 3rem;
   font-weight: 900;
-  letter-spacing: -0.05em;
+  letter-spacing: 0;
   color: #ffffff;
   margin: 0;
 }
@@ -378,7 +382,7 @@ onMounted(() => {
   font-size: 1.125rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: #ffffff;
   margin: 0;
 }
@@ -430,6 +434,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
 }
 
 .settings__toggle-title {
@@ -450,11 +455,19 @@ onMounted(() => {
   height: 1.5rem;
   background: #2d2d35;
   border-radius: 9999px;
+  border: none;
   position: relative;
   padding: 0.25rem;
   cursor: pointer;
   transition: background 200ms;
   flex-shrink: 0;
+}
+
+.settings__toggle:focus-visible,
+.settings__rise-fall-option:focus-visible,
+.settings__danger-btn:focus-visible {
+  outline: 2px solid var(--cs-border-focus);
+  outline-offset: 2px;
 }
 
 .settings__toggle--on {
@@ -471,6 +484,16 @@ onMounted(() => {
 
 .settings__toggle--on .settings__toggle-knob {
   transform: translateX(1.5rem);
+}
+
+.settings__status-pill {
+  flex-shrink: 0;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.375rem;
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 /* Notify grid */
@@ -546,11 +569,13 @@ onMounted(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 1rem 1.5rem;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   border: 2px solid #1f1f23;
+  background: transparent;
   cursor: pointer;
   transition: all 200ms;
   min-width: 160px;
+  color: inherit;
 }
 
 .settings__rise-fall-option:hover {
@@ -732,5 +757,27 @@ html:not(.dark) .settings__rise-fall-option--active .settings__rise-fall-label {
 
 html:not(.dark) .settings__danger-warn {
   color: #dc2626;
+}
+
+@media (max-width: 640px) {
+  .settings {
+    gap: 2rem;
+  }
+
+  .settings__title {
+    font-size: 2.25rem;
+  }
+
+  .settings__token-row {
+    flex-direction: column;
+  }
+
+  .settings__toggle-row {
+    align-items: flex-start;
+  }
+
+  .settings__rise-fall-option {
+    width: 100%;
+  }
 }
 </style>

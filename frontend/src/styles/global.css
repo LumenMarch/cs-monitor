@@ -92,6 +92,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+:where(button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--cs-border-focus);
+  outline-offset: 2px;
+}
+
+:where(button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])):focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* 深色模式下添加微妙的噪点纹理 */
 html.dark body::before {
   content: '';
@@ -232,7 +241,7 @@ html.dark .cs-glass-card:hover {
 .font-mono-num {
   font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 /* ===== 价格涨跌高亮闪烁 ===== */
@@ -293,8 +302,8 @@ html.dark ::selection {
 .glass-card {
   background: rgba(15, 15, 18, 0.5);
   border: 1px solid #1f1f23;
-  border-radius: 1rem;
-  padding: 1.5rem;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
   transition: all 300ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 .glass-card:hover {
@@ -330,6 +339,14 @@ html:not(.dark) .glass-card:hover {
 }
 .btn-primary:active {
   transform: scale(0.98);
+}
+
+.btn-primary:focus-visible,
+.btn-outline:focus-visible,
+.nav-item:focus-visible,
+.nav-item-active:focus-visible {
+  outline: 2px solid var(--cs-border-focus);
+  outline-offset: 2px;
 }
 
 /* 轮廓按钮 */
@@ -428,4 +445,15 @@ html:not(.dark) .nav-item-active {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
 }
