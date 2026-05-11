@@ -26,12 +26,14 @@ class PriceAnalyzer:
         client: SteamDTClient,
         db: Database,
         config: MonitorConfig,
+        user_id: int,
     ) -> None:
         self.client = client
         self.db = db
         self.config = config
+        self.user_id = user_id
         self.notifier = NotificationManager(config)
-        # 前日收盘价缓存：{market_hash_name: (price, fetched_date_str)}，每日刷新
+        # 前日收盘价缓存（市场公共数据，全用户共享同一份缓存即可）
         self._baseline_cache: dict[str, tuple[float, str]] = {}
         self._baseline_ttl = timedelta(hours=24)
 
@@ -99,8 +101,8 @@ class PriceAnalyzer:
         return None
 
     def _get_threshold(self, market_hash_name: str) -> float:
-        """获取指定饰品的波动阈值."""
-        threshold = self.db.get_watchlist_threshold(market_hash_name)
+        """获取当前用户对该饰品的波动阈值."""
+        threshold = self.db.get_watchlist_threshold(self.user_id, market_hash_name)
         if threshold is not None:
             return float(threshold)
         return float(self.config.default_threshold_percent)
@@ -110,12 +112,9 @@ class PriceAnalyzer:
         market_hash_name: str,
         alert_type: str,
     ) -> bool:
-        """检查告警是否处于冷却期.
-
-        Returns:
-            True 表示可以告警（不在冷却期），False 表示在冷却期.
-        """
+        """检查当前用户对该饰品的同类告警是否处于冷却期."""
         recent_alerts = self.db.get_recent_alerts(
+            self.user_id,
             market_hash_name,
             alert_type,
             hours=self.config.alert_cooldown_hours,
@@ -123,7 +122,11 @@ class PriceAnalyzer:
         return len(recent_alerts) == 0
 
     def recalculate_all_baselines(self) -> int:
-        """重算所有告警记录的基准价、波动幅度和类型（以前日 K 线收盘价为准）."""
+        """系统级：重算所有用户所有告警的基准价、波动幅度和类型.
+
+        get_all_alerts 返回带 user_id 的全量告警；update_alert_baseline 按 alert id
+        更新，无需 user_id 隔离.
+        """
         all_alerts = self.db.get_all_alerts()
         if not all_alerts:
             return 0
@@ -139,7 +142,6 @@ class PriceAnalyzer:
                 continue
             change = round(((current - new_baseline) / new_baseline) * 100, 2)
 
-            # 根据新波动幅度修正告警类型
             threshold = float(alert.get("threshold_percent", 5.0))
             if change >= threshold:
                 new_type = "price_surge"
@@ -204,10 +206,10 @@ class PriceAnalyzer:
 
             # 涨价告警
             if change_percent >= threshold:
-                if self._check_alert_cooldown(
-                    market_hash_name, "price_surge"
-                ):
-                    wl_item = self.db.get_watchlist_item(market_hash_name)
+                if self._check_alert_cooldown(market_hash_name, "price_surge"):
+                    wl_item = self.db.get_watchlist_item(
+                        self.user_id, market_hash_name
+                    )
                     display_name = wl_item.get("display_name") if wl_item else None
                     alert_data = {
                         "market_hash_name": market_hash_name,
@@ -220,6 +222,7 @@ class PriceAnalyzer:
                     sent = self.notifier.send_normal_alert(alert_data)
                     if sent:
                         self.db.insert_alert_log(
+                            self.user_id,
                             market_hash_name,
                             "price_surge",
                             current_price=current_price,
@@ -228,25 +231,25 @@ class PriceAnalyzer:
                         )
                         alerts.append(alert_data)
                         logger.warning(
-                            f"🚨 {market_hash_name} 涨价告警: "
+                            f"🚨 [user={self.user_id}] {market_hash_name} 涨价告警: "
                             f"+{change_percent:.2f}%"
                         )
                     else:
                         logger.error(
-                            f"🚨 {market_hash_name} 涨价告警通知发送失败，"
+                            f"🚨 [user={self.user_id}] {market_hash_name} 涨价告警通知发送失败，"
                             f"未记录冷却，下次将重试"
                         )
                 else:
                     logger.info(
-                        f"{market_hash_name} 涨价告警在冷却期内，跳过"
+                        f"[user={self.user_id}] {market_hash_name} 涨价告警在冷却期内，跳过"
                     )
 
             # 跌价告警
             elif change_percent <= -threshold:
-                if self._check_alert_cooldown(
-                    market_hash_name, "price_drop"
-                ):
-                    wl_item = self.db.get_watchlist_item(market_hash_name)
+                if self._check_alert_cooldown(market_hash_name, "price_drop"):
+                    wl_item = self.db.get_watchlist_item(
+                        self.user_id, market_hash_name
+                    )
                     display_name = wl_item.get("display_name") if wl_item else None
                     alert_data = {
                         "market_hash_name": market_hash_name,
@@ -259,6 +262,7 @@ class PriceAnalyzer:
                     sent = self.notifier.send_normal_alert(alert_data)
                     if sent:
                         self.db.insert_alert_log(
+                            self.user_id,
                             market_hash_name,
                             "price_drop",
                             current_price=current_price,
@@ -267,17 +271,17 @@ class PriceAnalyzer:
                         )
                         alerts.append(alert_data)
                         logger.warning(
-                            f"🚨 {market_hash_name} 跌价告警: "
+                            f"🚨 [user={self.user_id}] {market_hash_name} 跌价告警: "
                             f"{change_percent:.2f}%"
                         )
                     else:
                         logger.error(
-                            f"🚨 {market_hash_name} 跌价告警通知发送失败，"
+                            f"🚨 [user={self.user_id}] {market_hash_name} 跌价告警通知发送失败，"
                             f"未记录冷却，下次将重试"
                         )
                 else:
                     logger.info(
-                        f"{market_hash_name} 跌价告警在冷却期内，跳过"
+                        f"[user={self.user_id}] {market_hash_name} 跌价告警在冷却期内，跳过"
                     )
 
         return alerts

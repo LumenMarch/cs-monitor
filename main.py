@@ -118,31 +118,22 @@ def main() -> None:
             "用户可登录后在用户中心设置自己的 Key 跑监控 / 捡漏雷达"
         )
 
-    # 创建 FastAPI 应用（无论是否有 client/scheduler，Web 层始终启动）
+    # 创建 FastAPI 应用
     app = create_app(db, config)
 
-    # 初始化调度器（多用户改造中：暂时仅在有系统级 SteamDT Key 时启动；
-    # 后续会改造为按用户循环，每个用户用自己的 Key）
-    scheduler: MonitorScheduler | None = None
-    if client is not None:
-        scheduler = MonitorScheduler(client, db, config)
+    # 调度器始终启动（多用户模式）：每个 tick 循环已配置 SteamDT Key 的用户跑监控/极致追踪
+    # 系统级 client 可选，仅用于 items 全市场同步等系统任务（无系统级 Key 时借用任一用户 Key）
+    scheduler = MonitorScheduler(db, config, system_client=client)
 
-        def run_scheduler() -> None:
-            try:
-                assert scheduler is not None
-                scheduler.start()
-                logger.info("✅ 调度器已启动，系统运行中...")
-            except Exception:
-                logger.exception("调度器启动失败")
+    def run_scheduler() -> None:
+        try:
+            scheduler.start()
+            logger.info("✅ 调度器已启动（多用户模式），系统运行中...")
+        except Exception:
+            logger.exception("调度器启动失败")
 
-        scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-        scheduler_thread.start()
-    else:
-        logger.warning(
-            "⚠️ 调度器未启动（缺少系统级 STEAMDT_API_KEY）。"
-            "用户可通过 Web 登录并设置个人 Key，但自动监控暂未生效——"
-            "调度器多用户改造将在后续步骤完成。"
-        )
+    scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+    scheduler_thread.start()
 
     # 配置 uvicorn
     web_host = config.web_host
@@ -158,8 +149,7 @@ def main() -> None:
     # 注册信号处理：优雅退出
     def signal_handler(signum: int | None, frame: object | None) -> None:
         logger.info("🛑 收到中断信号，正在优雅退出...")
-        if scheduler is not None:
-            scheduler.shutdown(wait=True)
+        scheduler.shutdown(wait=True)
         if client is not None:
             client.close()
         server.should_exit = True

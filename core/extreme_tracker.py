@@ -27,16 +27,18 @@ class ExtremeTracker:
         client: SteamDTClient,
         db: Database,
         config: MonitorConfig,
+        user_id: int,
     ) -> None:
         self.client = client
         self.db = db
         self.config = config
+        self.user_id = user_id
         self.notifier = NotificationManager(config)
         self._next_run_at: dict[str, float] = {}
 
     def _track_id(self, track_config: dict) -> str:
-        """生成追踪项唯一标识."""
-        return f"{track_config['market_hash_name']}@{track_config['platform']}"
+        """生成追踪项唯一标识（含 user_id 防跨用户串扰）."""
+        return f"u{self.user_id}::{track_config['market_hash_name']}@{track_config['platform']}"
 
     def _get_interval(self, track_config: dict) -> int:
         """获取轮询间隔."""
@@ -75,7 +77,7 @@ class ExtremeTracker:
         if cooldown_seconds <= 0:
             return True
         recent = self.db.get_recent_extreme_alerts(
-            market_hash_name, platform, alert_type, cooldown_seconds
+            self.user_id, market_hash_name, platform, alert_type, cooldown_seconds
         )
         return len(recent) == 0
 
@@ -231,12 +233,12 @@ class ExtremeTracker:
         price = current.get("price")
         quantity = current.get("quantity")
 
-        # 获取上一次快照
-        last = self.db.get_latest_snapshot(market_hash_name, platform)
+        # 获取上一次快照（按用户隔离）
+        last = self.db.get_latest_snapshot(self.user_id, market_hash_name, platform)
 
-        # 写入快照
+        # 写入快照（按用户隔离）
         self.db.insert_extreme_snapshot(
-            market_hash_name, platform, price, quantity
+            self.user_id, market_hash_name, platform, price, quantity
         )
 
         # 首次采集不告警
@@ -291,6 +293,7 @@ class ExtremeTracker:
         sent = self.notifier.send_extreme_alert(result, market_hash_name, platform)
         if sent:
             self.db.insert_extreme_alert(
+                user_id=self.user_id,
                 market_hash_name=market_hash_name,
                 platform=platform,
                 alert_type=alert_type,
@@ -314,8 +317,8 @@ class ExtremeTracker:
             return None
 
     def tick(self) -> list[dict[str, Any]]:
-        """执行一轮极致追踪检查."""
-        tracks = self.db.get_extreme_track_configs(enabled_only=True)
+        """执行一轮极致追踪检查（仅当前用户）."""
+        tracks = self.db.get_extreme_track_configs(self.user_id, enabled_only=True)
         if not tracks:
             return []
 

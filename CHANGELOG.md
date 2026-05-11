@@ -8,16 +8,29 @@
 
 ## [bargain-radar 分支] · 进行中
 
+### Added — 第三阶段：调度器多用户循环（2026-05-11）
+
+- `core/monitor.py` `PriceMonitor` 接收 `user_id`，watchlist 采集按用户隔离
+- `core/analyzer.py` `PriceAnalyzer` 接收 `user_id`，告警冷却 / 阈值查询 / 写入按 user_id；
+  `recalculate_all_baselines` 改为系统级（按 alert.id 更新）
+- `core/extreme_tracker.py` `ExtremeTracker` 接收 `user_id`，track_id 加 `u{id}::` 前缀
+  避免跨用户串扰；snapshots / extreme_alerts 全部按 user_id 隔离
+- `core/scheduler.py` 完全重写为多用户调度：
+  - 每个 monitor / extreme_tracker tick 循环 `list_users_with_steamdt_key()`
+  - 按用户解密其 SteamDT Key、临时创建 client、跑完立即 close
+  - items 同步 / 启动基准价重算：系统级任务，优先 .env 系统 Key，无则借用任一用户 Key
+- `main.py`：调度器始终启动（不再以系统级 Key 为前置条件）
+
 ### Added — 第二阶段：业务 router user_id 隔离（2026-05-11）
 
 - `storage/database.py` 25+ DB 方法签名加 `user_id` 必填，所有受隔离表（watchlist /
- extreme_track_config / alert_logs / extreme_track_snapshots / extreme_track_alerts）
- 的 CRUD 一律强制传入 `user_id`，删除已不再使用的 `import_default_watchlist` /
- `import_default_extreme_track`
+  extreme_track_config / alert_logs / extreme_track_snapshots / extreme_track_alerts）
+  的 CRUD 一律强制传入 `user_id`，删除已不再使用的 `import_default_watchlist` /
+  `import_default_extreme_track`
 - 8 个业务 routers 全部按当前登录用户隔离：watchlist / extreme_track / alerts /
- dashboard / prices / kline / archive / settings
+  dashboard / prices / kline / archive / settings
 - 关键端点支持"优先用用户 SteamDT API Key、回退系统级 Key"：
- `/api/watchlist/refresh`、`/api/prices/lookup`、`/api/kline/{name}`
+  `/api/watchlist/refresh`、`/api/prices/lookup`、`/api/kline/{name}`
 - 通知设置 / 数据库导出与清空 / 归档触发全部改为 `require_admin`
 - `web/deps.require_password_changed` 全面接入业务路由（首次登录未改密拦截）
 
