@@ -3,8 +3,8 @@
     <!-- 标题区 -->
     <div class="bargain__header">
       <div>
-        <h2 class="bargain__title">捡漏雷达</h2>
-        <p class="bargain__desc">基于本地价格记录跨平台扫描套利机会，按你的阈值与平台白名单触发推送。</p>
+        <h2 class="bargain__title">Steam 搬砖</h2>
+        <p class="bargain__desc">从国内三方平台（BUFF / YYYP / IGXE / C5GAME）低价买入，搬到 Steam 社区市场高价卖出，自动扫描跨市价差并按你的阈值推送。</p>
       </div>
       <div class="bargain__header-actions">
         <button
@@ -23,7 +23,7 @@
       <div class="bargain__config-head">
         <div>
           <h3 class="bargain__config-title">扫描参数</h3>
-          <p class="bargain__config-sub">仅扫描你 watchlist 已采集的饰品，扫描完全基于本地数据，不消耗 SteamDT 配额。</p>
+          <p class="bargain__config-sub">默认买入方为国内三方、卖出方为 Steam；可自定义白名单覆盖。扫描完全基于本地价格记录，不消耗 SteamDT 配额。</p>
         </div>
         <label class="bargain__switch">
           <span>启用</span>
@@ -33,7 +33,7 @@
 
       <div class="bargain__form-grid">
         <div class="bargain__field">
-          <label>最小利润率 (%)</label>
+          <label>最小毛利率 (%)，不含 Steam 15% 税</label>
           <n-input-number
             v-model:value="config.min_profit_percent"
             :min="0"
@@ -43,7 +43,7 @@
           />
         </div>
         <div class="bargain__field">
-          <label>最小利润金额 (¥)</label>
+          <label>最小毛利金额 (¥)</label>
           <n-input-number
             v-model:value="config.min_profit_amount"
             :min="0"
@@ -78,29 +78,29 @@
           <n-input-number v-model:value="config.alert_cooldown_minutes" :min="0" :max="10080" />
         </div>
         <div class="bargain__field bargain__field--full">
-          <label>买入平台白名单</label>
+          <label>买入平台白名单（留空 = 默认 BUFF / YYYP / IGXE / C5GAME）</label>
           <n-select
             v-model:value="config.buy_platforms"
             multiple
             filterable
             tag
-            :options="platformOptions"
-            placeholder="留空表示所有平台"
+            :options="buyPlatformOptions"
+            placeholder="留空使用默认国内三方平台"
           />
         </div>
         <div class="bargain__field bargain__field--full">
-          <label>卖出平台白名单</label>
+          <label>卖出平台白名单（留空 = 默认 STEAM）</label>
           <n-select
             v-model:value="config.sell_platforms"
             multiple
             filterable
             tag
-            :options="platformOptions"
-            placeholder="留空表示所有平台"
+            :options="sellPlatformOptions"
+            placeholder="留空仅扫描 STEAM 作为卖出方"
           />
         </div>
         <div class="bargain__field bargain__field--full bargain__field--inline">
-          <span>命中后推送到当前通知渠道</span>
+          <span>命中后推送到当前通知渠道（Steam 15% 税请自行折算）</span>
           <n-switch v-model:value="notifyModel" />
         </div>
       </div>
@@ -155,7 +155,7 @@
       <div v-else-if="items.length === 0" class="glass-card bargain__empty">
         <Radar class="bargain__empty-icon" />
         <p class="bargain__empty-text">
-          {{ config.enabled ? '暂无机会，等待下次扫描…' : '请先启用捡漏雷达并保存配置' }}
+          {{ config.enabled ? '暂无机会，等待下次扫描…' : '请先启用 Steam 搬砖并保存配置' }}
         </p>
       </div>
 
@@ -166,8 +166,8 @@
               <th>饰品</th>
               <th>买入</th>
               <th>卖出</th>
-              <th>利润</th>
-              <th>利润率</th>
+              <th>毛利</th>
+              <th>毛利率</th>
               <th>扫描时间</th>
               <th></th>
             </tr>
@@ -260,12 +260,14 @@ const filterName = ref('')
 const filterMinProfit = ref<number | null>(null)
 const includeDismissed = ref(false)
 
-const platformOptions = [
+const buyPlatformOptions = [
   { label: 'BUFF', value: 'BUFF' },
   { label: 'YYYP（悠悠有品）', value: 'YYYP' },
   { label: 'IGXE', value: 'IGXE' },
   { label: 'C5GAME', value: 'C5GAME' },
-  { label: 'STEAM', value: 'STEAM' },
+]
+const sellPlatformOptions = [
+  { label: 'STEAM 社区市场', value: 'STEAM' },
 ]
 
 function formatDateTime(iso: string | null): string {

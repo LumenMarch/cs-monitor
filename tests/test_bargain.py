@@ -157,18 +157,19 @@ class TestBargainScanner:
     def test_scan_disabled_returns_empty(self, env):
         db = env["db"]
         self._seed_price(db, "AK", "BUFF", 100.0)
-        self._seed_price(db, "AK", "YYYP", 130.0)
+        self._seed_price(db, "AK", "STEAM", 130.0)
         scanner = BargainScanner(db, env["config"], env["user_id"])
         scanner.notifier = MagicMock()
         assert scanner.scan() == []
 
-    def test_scan_hits_threshold(self, env):
+    def test_scan_hits_threshold_default_steam_route(self, env):
+        """默认平台策略：买入=国内三方，卖出=STEAM（无需显式配置白名单）."""
         db = env["db"]
         db.upsert_bargain_config(
             user_id=env["user_id"], enabled=True, min_profit_percent=5.0
         )
         self._seed_price(db, "AK", "BUFF", 100.0)
-        self._seed_price(db, "AK", "YYYP", 130.0)
+        self._seed_price(db, "AK", "STEAM", 130.0)
         scanner = BargainScanner(db, env["config"], env["user_id"])
         scanner.notifier = MagicMock()
         scanner.notifier.send_bargain_alert = MagicMock(return_value=True)
@@ -177,11 +178,24 @@ class TestBargainScanner:
         assert len(results) == 1
         r = results[0]
         assert r["buy_platform"] == "BUFF"
-        assert r["sell_platform"] == "YYYP"
+        assert r["sell_platform"] == "STEAM"
         assert r["profit_amount"] == 30.0
         assert r["profit_percent"] == 30.0
         assert r["notified"] is True
         scanner.notifier.send_bargain_alert.assert_called_once()
+
+    def test_scan_default_excludes_third_party_to_third_party(self, env):
+        """默认策略不应在国内三方之间互相套利（卖出方默认锁 Steam）."""
+        db = env["db"]
+        db.upsert_bargain_config(
+            user_id=env["user_id"], enabled=True, min_profit_percent=5.0
+        )
+        # 只在 BUFF / YYYP 之间有价差，没有 STEAM 价格 → 默认策略下不应命中
+        self._seed_price(db, "AK", "BUFF", 100.0)
+        self._seed_price(db, "AK", "YYYP", 130.0)
+        scanner = BargainScanner(db, env["config"], env["user_id"])
+        scanner.notifier = MagicMock()
+        assert scanner.scan() == []
 
     def test_scan_skips_below_threshold(self, env):
         db = env["db"]
@@ -189,7 +203,7 @@ class TestBargainScanner:
             user_id=env["user_id"], enabled=True, min_profit_percent=50.0
         )
         self._seed_price(db, "AK", "BUFF", 100.0)
-        self._seed_price(db, "AK", "YYYP", 110.0)
+        self._seed_price(db, "AK", "STEAM", 110.0)
         scanner = BargainScanner(db, env["config"], env["user_id"])
         scanner.notifier = MagicMock()
         assert scanner.scan() == []
@@ -203,7 +217,7 @@ class TestBargainScanner:
             alert_cooldown_minutes=60,
         )
         self._seed_price(db, "AK", "BUFF", 100.0)
-        self._seed_price(db, "AK", "YYYP", 130.0)
+        self._seed_price(db, "AK", "STEAM", 130.0)
         scanner = BargainScanner(db, env["config"], env["user_id"])
         scanner.notifier = MagicMock()
         scanner.notifier.send_bargain_alert = MagicMock(return_value=True)
@@ -223,24 +237,45 @@ class TestBargainScanner:
         )
         # buy_price=100 > max 50，应被过滤
         self._seed_price(db, "AK", "BUFF", 100.0)
-        self._seed_price(db, "AK", "YYYP", 130.0)
+        self._seed_price(db, "AK", "STEAM", 130.0)
         scanner = BargainScanner(db, env["config"], env["user_id"])
         scanner.notifier = MagicMock()
         assert scanner.scan() == []
 
-    def test_scan_respects_platform_whitelist(self, env):
+    def test_scan_respects_buy_platform_whitelist(self, env):
+        """显式配置 buy_platforms 只允许 IGXE，但只有 BUFF 价格 → 不命中."""
         db = env["db"]
         db.upsert_bargain_config(
             user_id=env["user_id"],
             enabled=True,
             min_profit_percent=5.0,
-            buy_platforms=json.dumps(["IGXE"]),  # 没有 BUFF
+            buy_platforms=json.dumps(["IGXE"]),
+        )
+        self._seed_price(db, "AK", "BUFF", 100.0)
+        self._seed_price(db, "AK", "STEAM", 130.0)
+        scanner = BargainScanner(db, env["config"], env["user_id"])
+        scanner.notifier = MagicMock()
+        assert scanner.scan() == []
+
+    def test_scan_custom_sell_platform_overrides_default(self, env):
+        """显式配置 sell_platforms 可覆盖默认 STEAM 锁定，做反向/任意方向套利."""
+        db = env["db"]
+        db.upsert_bargain_config(
+            user_id=env["user_id"],
+            enabled=True,
+            min_profit_percent=5.0,
+            sell_platforms=json.dumps(["YYYP"]),
         )
         self._seed_price(db, "AK", "BUFF", 100.0)
         self._seed_price(db, "AK", "YYYP", 130.0)
         scanner = BargainScanner(db, env["config"], env["user_id"])
         scanner.notifier = MagicMock()
-        assert scanner.scan() == []
+        scanner.notifier.send_bargain_alert = MagicMock(return_value=True)
+
+        results = scanner.scan()
+        assert len(results) == 1
+        assert results[0]["buy_platform"] == "BUFF"
+        assert results[0]["sell_platform"] == "YYYP"
 
     def test_scan_notify_disabled_still_records(self, env):
         db = env["db"]
@@ -251,7 +286,7 @@ class TestBargainScanner:
             notify_enabled=False,
         )
         self._seed_price(db, "AK", "BUFF", 100.0)
-        self._seed_price(db, "AK", "YYYP", 130.0)
+        self._seed_price(db, "AK", "STEAM", 130.0)
         scanner = BargainScanner(db, env["config"], env["user_id"])
         scanner.notifier = MagicMock()
         scanner.notifier.send_bargain_alert = MagicMock(return_value=True)

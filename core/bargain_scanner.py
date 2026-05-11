@@ -1,10 +1,17 @@
-"""捡漏雷达扫描器.
+"""Steam 搬砖扫描器.
+
+业务定位：在国内三方交易平台（BUFF / YYYP / IGXE / C5GAME 等）低价买入，
+搬到 Steam 社区市场高价卖出，赚取跨市差价.
 
 设计：基于 price_records（SteamDT batch 采集结果，市场公共数据）做跨平台
 价差扫描，无需额外调用 SteamDT API.
 
 每用户独立配置（min_profit_percent / 买入/卖出平台白名单 / 价格区间 /
 冷却分钟数 / 通知开关），扫描结果写入 bargain_opportunities 表.
+
+默认平台策略（buy_platforms / sell_platforms 留空时）：
+  - 买入方默认为 BUFF / YYYP / IGXE / C5GAME（国内三方）
+  - 卖出方默认锁 STEAM（不在国内三方之间互相套利）
 """
 
 from __future__ import annotations
@@ -19,8 +26,14 @@ from notify.manager import NotificationManager
 from storage.database import Database
 
 
+DEFAULT_BUY_PLATFORMS: frozenset[str] = frozenset(
+    {"BUFF", "YYYP", "IGXE", "C5GAME"}
+)
+DEFAULT_SELL_PLATFORMS: frozenset[str] = frozenset({"STEAM"})
+
+
 class BargainScanner:
-    """捡漏雷达扫描器（多用户）."""
+    """Steam 搬砖扫描器（多用户）."""
 
     def __init__(
         self,
@@ -69,8 +82,15 @@ class BargainScanner:
         max_buy_price = float(cfg.get("max_buy_price") or 0.0)
         cooldown_minutes = int(cfg.get("alert_cooldown_minutes") or 0)
         notify_enabled = bool(cfg.get("notify_enabled"))
-        buy_whitelist = self._parse_platform_list(cfg.get("buy_platforms"))
-        sell_whitelist = self._parse_platform_list(cfg.get("sell_platforms"))
+        # 留空时按 Steam 搬砖默认：买入=国内三方，卖出=Steam
+        buy_whitelist = (
+            self._parse_platform_list(cfg.get("buy_platforms"))
+            or set(DEFAULT_BUY_PLATFORMS)
+        )
+        sell_whitelist = (
+            self._parse_platform_list(cfg.get("sell_platforms"))
+            or set(DEFAULT_SELL_PLATFORMS)
+        )
 
         grouped = self._load_latest_prices()
         if not grouped:
@@ -81,16 +101,12 @@ class BargainScanner:
             if len(platforms) < 2:
                 continue
 
-            buy_candidates = platforms
-            sell_candidates = platforms
-            if buy_whitelist:
-                buy_candidates = [
-                    p for p in platforms if p["platform"].upper() in buy_whitelist
-                ]
-            if sell_whitelist:
-                sell_candidates = [
-                    p for p in platforms if p["platform"].upper() in sell_whitelist
-                ]
+            buy_candidates = [
+                p for p in platforms if p["platform"].upper() in buy_whitelist
+            ]
+            sell_candidates = [
+                p for p in platforms if p["platform"].upper() in sell_whitelist
+            ]
             if not buy_candidates or not sell_candidates:
                 continue
 
