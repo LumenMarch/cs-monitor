@@ -1,12 +1,12 @@
-"""告警记录路由."""
+"""告警记录路由（按 user_id 隔离）."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
 from storage.database import Database
-from web.deps import get_db, require_auth
-from web.schemas import AlertRecord, AlertStatsItem, AlertStatsResponse
+from web.deps import get_db, require_password_changed
+from web.schemas import AlertStatsItem, AlertStatsResponse
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -20,19 +20,11 @@ def get_alerts(
     end_date: str | None = None,
     market_hash_name: str | None = None,
     db: Database = Depends(get_db),
-    user: dict = Depends(require_auth),
+    user: dict = Depends(require_password_changed),
 ) -> dict:
-    """分页查询告警记录.
-
-    支持参数：
-    - page: 页码（默认1）
-    - limit: 每页数量（默认20，最大100）
-    - alert_type: 告警类型过滤
-    - start_date: 开始日期 (YYYY-MM-DD)
-    - end_date: 结束日期 (YYYY-MM-DD)
-    - market_hash_name: 饰品名称模糊匹配
-    """
+    """分页查询当前用户的告警记录."""
     rows, total = db.get_alerts(
+        user_id=user["id"],
         page=page,
         limit=limit,
         alert_type=alert_type,
@@ -53,15 +45,11 @@ def get_alert_stats(
     start_date: str | None = None,
     end_date: str | None = None,
     db: Database = Depends(get_db),
-    user: dict = Depends(require_auth),
+    user: dict = Depends(require_password_changed),
 ) -> dict:
-    """告警统计（按天/类型聚合）.
-
-    支持参数：
-    - start_date: 开始日期 (YYYY-MM-DD)
-    - end_date: 结束日期 (YYYY-MM-DD)
-    """
+    """当前用户告警统计（按天/类型聚合）."""
     by_day_raw, by_type_raw = db.get_alert_stats(
+        user_id=user["id"],
         start_date=start_date,
         end_date=end_date,
     )

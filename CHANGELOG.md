@@ -8,6 +8,19 @@
 
 ## [bargain-radar 分支] · 进行中
 
+### Added — 第二阶段：业务 router user_id 隔离（2026-05-11）
+
+- `storage/database.py` 25+ DB 方法签名加 `user_id` 必填，所有受隔离表（watchlist /
+ extreme_track_config / alert_logs / extreme_track_snapshots / extreme_track_alerts）
+ 的 CRUD 一律强制传入 `user_id`，删除已不再使用的 `import_default_watchlist` /
+ `import_default_extreme_track`
+- 8 个业务 routers 全部按当前登录用户隔离：watchlist / extreme_track / alerts /
+ dashboard / prices / kline / archive / settings
+- 关键端点支持"优先用用户 SteamDT API Key、回退系统级 Key"：
+ `/api/watchlist/refresh`、`/api/prices/lookup`、`/api/kline/{name}`
+- 通知设置 / 数据库导出与清空 / 归档触发全部改为 `require_admin`
+- `web/deps.require_password_changed` 全面接入业务路由（首次登录未改密拦截）
+
 ### Added — 第一阶段：uv 迁移 + 多用户认证骨架（2026-05-11，commit 89ee00c）
 
 **工程基础设施**

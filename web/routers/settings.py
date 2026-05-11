@@ -12,7 +12,7 @@ from notify.serverchan import ServerChanChannel
 from notify.telegram import TelegramChannel
 from notify.wecom import WeComChannel
 from storage.database import Database
-from web.deps import get_config, get_db, require_auth
+from web.deps import get_config, get_db, require_admin, require_password_changed
 from web.schemas import NotifySettings, NotifyTestRequest
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -32,9 +32,9 @@ CONFIG_KEYS = {
 def get_notify_settings(
     db: Database = Depends(get_db),
     config=Depends(get_config),
-    user: dict = Depends(require_auth),
+    _admin: dict = Depends(require_admin),
 ) -> dict:
-    """获取当前通知配置（DB 优先，fallback 到 .env/config）."""
+    """获取当前通知配置（全局共享，仅管理员）."""
     return {
         "notify_channel": db.get_system_config("notify_channel") or config.notify_channel,
         "wecom_webhook_url": db.get_system_config("wecom_webhook_url") or config.wecom_webhook_url,
@@ -48,9 +48,9 @@ def get_notify_settings(
 def update_notify_settings(
     settings: NotifySettings,
     db: Database = Depends(get_db),
-    user: dict = Depends(require_auth),
+    _admin: dict = Depends(require_admin),
 ) -> dict:
-    """更新通知配置到 system_config 表."""
+    """更新通知配置（全局共享，仅管理员）."""
     for field in CONFIG_KEYS:
         value = getattr(settings, field)
         if value is not None:
@@ -63,9 +63,9 @@ def test_notify(
     req: NotifyTestRequest,
     db: Database = Depends(get_db),
     config=Depends(get_config),
-    user: dict = Depends(require_auth),
+    _admin: dict = Depends(require_admin),
 ) -> dict:
-    """发送测试通知."""
+    """发送测试通知（仅管理员）."""
     channel = req.channel or (
         db.get_system_config("notify_channel") or config.notify_channel
     )
@@ -119,9 +119,9 @@ def test_notify(
 def get_system_info(
     db: Database = Depends(get_db),
     config=Depends(get_config),
-    user: dict = Depends(require_auth),
+    user: dict = Depends(require_password_changed),
 ) -> dict:
-    """获取系统信息（数据目录、版本、数据库状态等）."""
+    """获取系统信息 + 当前用户的 watchlist / extreme 数量."""
     db_path = Path(db.db_path)
     db_size = db_path.stat().st_size if db_path.exists() else 0
     return {
@@ -130,17 +130,17 @@ def get_system_info(
         "db_size": db_size,
         "db_size_human": _human_readable_size(db_size),
         "data_dir": str(db_path.parent),
-        "watchlist_count": db.get_watchlist_count(enabled_only=False),
-        "extreme_track_count": db.get_extreme_track_count(enabled_only=False),
+        "watchlist_count": db.get_watchlist_count(user["id"], enabled_only=False),
+        "extreme_track_count": db.get_extreme_track_count(user["id"], enabled_only=False),
     }
 
 
 @router.get("/db/export")
 def export_database(
     db: Database = Depends(get_db),
-    user: dict = Depends(require_auth),
+    _admin: dict = Depends(require_admin),
 ) -> FileResponse:
-    """导出数据库文件."""
+    """导出数据库文件（仅管理员）."""
     db_path = Path(db.db_path)
     if not db_path.exists():
         raise HTTPException(status_code=404, detail="数据库文件不存在")
@@ -155,9 +155,9 @@ def export_database(
 def clear_database(
     confirm: bool = False,
     db: Database = Depends(get_db),
-    user: dict = Depends(require_auth),
+    _admin: dict = Depends(require_admin),
 ) -> dict:
-    """清空价格记录和告警记录（保留配置表）."""
+    """清空所有价格记录和告警记录（仅管理员，影响全部用户）."""
     if not confirm:
         raise HTTPException(status_code=400, detail="必须设置 confirm=true 才能清空数据")
     try:

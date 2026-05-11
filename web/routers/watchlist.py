@@ -1,4 +1,4 @@
-"""监控清单路由."""
+"""监控清单路由（按 user_id 隔离）."""
 
 from __future__ import annotations
 
@@ -18,7 +18,12 @@ from api.steamdt import (
 )
 from config import MonitorConfig
 from storage.database import Database
-from web.deps import get_config, get_db, require_auth
+from web.deps import (
+    get_config,
+    get_current_user_steamdt_key,
+    get_db,
+    require_password_changed,
+)
 from web.schemas import (
     WatchlistItem,
     WatchlistItemCreate,
@@ -28,7 +33,7 @@ from web.schemas import (
 
 router = APIRouter(prefix="/watchlist", tags=["watchlist"])
 
-# 前日收盘价缓存：{market_hash_name: (close_price, fetch_date_str)}
+# 前日收盘价缓存（全市场公共，无需按 user 隔离）：{market_hash_name: (close_price, fetch_date_str)}
 _yesterday_close_cache: dict[str, tuple[float, str]] = {}
 
 
@@ -45,7 +50,7 @@ def _get_yesterday_close(
     try:
         resp = client.get_item_kline(
             market_hash_name=market_hash_name,
-            kline_type=2,  # 日K
+            kline_type=2,
             platform="ALL",
         )
     except (SteamDTError, SteamDTBusinessError, SteamDTRateLimitError):
@@ -55,13 +60,13 @@ def _get_yesterday_close(
     if not isinstance(raw, list) or len(raw) < 2:
         return None
 
-    # SteamDT 日K 格式: [timestamp, open, close, high, low]
-    # 按时间升序取倒数第二个（昨天）
-    raw_sorted = sorted(raw, key=lambda x: x[0] if isinstance(x, list) and len(x) >= 1 else 0)
+    raw_sorted = sorted(
+        raw, key=lambda x: x[0] if isinstance(x, list) and len(x) >= 1 else 0
+    )
     yesterday = raw_sorted[-2]
     if isinstance(yesterday, list) and len(yesterday) >= 3:
         try:
-            close = float(yesterday[2])  # index 2 = close
+            close = float(yesterday[2])
         except (TypeError, ValueError):
             return None
         _yesterday_close_cache[market_hash_name] = (close, today)
@@ -69,22 +74,55 @@ def _get_yesterday_close(
     return None
 
 
+def _get_user_or_system_client(
+    request: Request,
+    config: MonitorConfig,
+    user_api_key: str | None,
+) -> SteamDTClient:
+    """优先用用户自己的 SteamDT Key 创建客户端；否则回退到系统级 client（如有）.
+
+    用户级 client 不缓存到 app.state（每个请求新建后调用即关），避免跨用户串扰.
+    """
+    if user_api_key:
+        return SteamDTClient(
+            SteamDTConfig(
+                api_key=user_api_key,
+                base_url=config.api_base_url,
+                timeout=config.request_timeout,
+                max_retries=config.request_retry,
+            )
+        )
+    client = getattr(request.app.state, "steamdt_client", None)
+    if client is None:
+        raise HTTPException(
+            status_code=400,
+            detail="未配置 SteamDT API Key——请在用户中心填写个人 Key，"
+            "或由管理员在 .env 中设置 STEAMDT_API_KEY",
+        )
+    return client
+
+
 @router.get("", response_model=list[WatchlistItemWithPrice])
 def get_watchlist(
     request: Request,
     db: Database = Depends(get_db),
     config: MonitorConfig = Depends(get_config),
-    user: dict = Depends(require_auth),
+    user: dict = Depends(require_password_changed),
+    user_api_key: str | None = Depends(get_current_user_steamdt_key),
 ) -> list[dict]:
-    """获取全部监控清单（含最新价格和前日收盘价）."""
-    items = db.get_watchlist_with_latest_price(enabled_only=False)
+    """获取当前用户的全部监控清单（含最新价格和前日收盘价）."""
+    items = db.get_watchlist_with_latest_price(user["id"], enabled_only=False)
 
-    # 附上前一交易日 K 线收盘价
-    client = _get_steamdt_client(request, config)
-    for item in items:
-        name = item.get("market_hash_name")
-        if name:
-            item["yesterday_close"] = _get_yesterday_close(name, client)
+    # 仅当用户有 Key 或系统有 Key 时才尝试拉 K 线，否则跳过（不阻断列表展示）
+    if user_api_key or getattr(request.app.state, "steamdt_client", None):
+        try:
+            client = _get_user_or_system_client(request, config, user_api_key)
+            for item in items:
+                name = item.get("market_hash_name")
+                if name:
+                    item["yesterday_close"] = _get_yesterday_close(name, client)
+        except HTTPException:
+            pass
 
     return items
 
@@ -93,22 +131,23 @@ def get_watchlist(
 def create_watchlist_item(
     item: WatchlistItemCreate,
     db: Database = Depends(get_db),
-    user: dict = Depends(require_auth),
+    user: dict = Depends(require_password_changed),
 ) -> dict:
-    """添加监控清单项."""
-    existing = db.get_watchlist_item(item.market_hash_name)
+    """添加监控清单项到当前用户."""
+    existing = db.get_watchlist_item(user["id"], item.market_hash_name)
     if existing:
         raise HTTPException(
             status_code=409,
             detail=f"饰品 '{item.market_hash_name}' 已在监控清单中",
         )
     db.insert_watchlist_item(
+        user_id=user["id"],
         market_hash_name=item.market_hash_name,
         display_name=item.display_name,
         threshold_percent=item.threshold_percent,
         enabled=item.enabled,
     )
-    result = db.get_watchlist_item(item.market_hash_name)
+    result = db.get_watchlist_item(user["id"], item.market_hash_name)
     if not result:
         raise HTTPException(status_code=500, detail="创建失败")
     return dict(result)
@@ -119,22 +158,25 @@ def update_watchlist_item(
     market_hash_name: str,
     item: WatchlistItemUpdate,
     db: Database = Depends(get_db),
-    user: dict = Depends(require_auth),
+    user: dict = Depends(require_password_changed),
 ) -> dict:
-    """更新监控清单项."""
-    existing = db.get_watchlist_item(market_hash_name)
+    """更新当前用户的监控清单项."""
+    existing = db.get_watchlist_item(user["id"], market_hash_name)
     if not existing:
         raise HTTPException(
             status_code=404,
             detail=f"饰品 '{market_hash_name}' 不存在",
         )
-    db.update_watchlist_item(
+    updated = db.update_watchlist_item(
+        user_id=user["id"],
         market_hash_name=market_hash_name,
         display_name=item.display_name,
         threshold_percent=item.threshold_percent,
         enabled=item.enabled,
     )
-    result = db.get_watchlist_item(market_hash_name)
+    if not updated:
+        raise HTTPException(status_code=404, detail="饰品不存在")
+    result = db.get_watchlist_item(user["id"], market_hash_name)
     if result is None:
         raise HTTPException(status_code=404, detail="饰品不存在")
     return dict(result)
@@ -144,16 +186,15 @@ def update_watchlist_item(
 def delete_watchlist_item(
     market_hash_name: str,
     db: Database = Depends(get_db),
-    user: dict = Depends(require_auth),
+    user: dict = Depends(require_password_changed),
 ) -> dict:
-    """删除监控清单项."""
-    existing = db.get_watchlist_item(market_hash_name)
-    if not existing:
+    """删除当前用户的监控清单项."""
+    deleted = db.delete_watchlist_item(user["id"], market_hash_name)
+    if not deleted:
         raise HTTPException(
             status_code=404,
             detail=f"饰品 '{market_hash_name}' 不存在",
         )
-    db.delete_watchlist_item(market_hash_name)
     return {"message": f"已删除 '{market_hash_name}'"}
 
 
@@ -183,37 +224,24 @@ class RefreshResponse(BaseModel):
     items: list[RefreshItemResult]
 
 
-def _get_steamdt_client(request: Request, config: MonitorConfig) -> SteamDTClient:
-    """从 app.state 取共享 client；不存在则惰性创建一个并缓存."""
-    client = getattr(request.app.state, "steamdt_client", None)
-    if client is None:
-        client = SteamDTClient(SteamDTConfig(
-            api_key=config.api_key,
-            base_url=config.api_base_url,
-            timeout=config.request_timeout,
-            max_retries=config.request_retry,
-        ))
-        request.app.state.steamdt_client = client
-    return client
-
-
 @router.post("/refresh", response_model=RefreshResponse)
 def refresh_watchlist_prices(
     payload: RefreshRequest,
     request: Request,
     db: Database = Depends(get_db),
     config: MonitorConfig = Depends(get_config),
-    user: dict = Depends(require_auth),
+    user: dict = Depends(require_password_changed),
+    user_api_key: str | None = Depends(get_current_user_steamdt_key),
 ) -> RefreshResponse:
     """立即刷新指定物品（或全部）的价格.
 
     使用 SteamDT batch 端点（1 次/分钟限制），单次最多 100 个.
+    优先使用当前用户的 SteamDT Key.
     """
-    # 1) 解析目标列表
     if payload.market_hash_names:
-        names = list(dict.fromkeys(payload.market_hash_names))  # 去重保序
+        names = list(dict.fromkeys(payload.market_hash_names))
     else:
-        watchlist = db.get_watchlist(enabled_only=True)
+        watchlist = db.get_watchlist(user["id"], enabled_only=True)
         names = [
             it["market_hash_name"]
             for it in watchlist
@@ -229,8 +257,9 @@ def refresh_watchlist_prices(
             detail=f"单次最多刷新 100 个，您选了 {len(names)} 个。请分批操作或取消部分选中。",
         )
 
-    # 2) 调 SteamDT batch
-    client = _get_steamdt_client(request, config)
+    client = _get_user_or_system_client(request, config, user_api_key)
+    # 用户级 client 用完即关；系统级 client 由 lifespan 管理
+    user_owned_client = bool(user_api_key)
     started = _time.monotonic()
 
     try:
@@ -254,8 +283,10 @@ def refresh_watchlist_prices(
         )
     except SteamDTError as e:
         raise HTTPException(status_code=502, detail=f"SteamDT 调用失败: {e}")
+    finally:
+        if user_owned_client:
+            client.close()
 
-    # 3) 解析响应 + 写快照
     data_list = response.get("data") or []
     by_name = {
         it.get("marketHashName"): it
@@ -267,12 +298,15 @@ def refresh_watchlist_prices(
     for name in names:
         item = by_name.get(name)
         if not item:
-            results.append(RefreshItemResult(
-                market_hash_name=name, ok=False, error="not_found_in_response"
-            ))
+            results.append(
+                RefreshItemResult(
+                    market_hash_name=name,
+                    ok=False,
+                    error="not_found_in_response",
+                )
+            )
             continue
 
-        # 确保 items 表有外键记录
         db.insert_item(name)
 
         platform_data = item.get("dataList") or []
@@ -291,13 +325,15 @@ def refresh_watchlist_prices(
                 prices.append(price_f)
 
         latest = min(prices) if prices else None
-        results.append(RefreshItemResult(
-            market_hash_name=name,
-            ok=latest is not None,
-            latest_price=latest,
-            platform_count=len(prices),
-            error=None if latest is not None else "no_valid_platform_price",
-        ))
+        results.append(
+            RefreshItemResult(
+                market_hash_name=name,
+                ok=latest is not None,
+                latest_price=latest,
+                platform_count=len(prices),
+                error=None if latest is not None else "no_valid_platform_price",
+            )
+        )
 
     duration_ms = int((_time.monotonic() - started) * 1000)
     success_count = sum(1 for r in results if r.ok)

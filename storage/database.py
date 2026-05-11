@@ -545,38 +545,42 @@ class Database:
     # ------------------------------------------------------------------
     def insert_alert_log(
         self,
+        user_id: int,
         market_hash_name: str,
         alert_type: str,
         current_price: float | None = None,
         baseline_price: float | None = None,
         change_percent: float | None = None,
     ) -> None:
-        """写入普通监控告警记录."""
+        """写入普通监控告警记录（按 user_id 隔离）."""
         with self._cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO alert_logs
-                (market_hash_name, alert_type, current_price, baseline_price, change_percent)
-                VALUES (?, ?, ?, ?, ?)
+                (user_id, market_hash_name, alert_type, current_price, baseline_price, change_percent)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (market_hash_name, alert_type, current_price, baseline_price, change_percent),
+                (user_id, market_hash_name, alert_type, current_price, baseline_price, change_percent),
             )
 
     def get_recent_alerts(
         self,
+        user_id: int,
         market_hash_name: str,
         alert_type: str,
         hours: int = 4,
     ) -> list[dict[str, Any]]:
-        """查询最近 N 小时内的同类告警记录."""
+        """查询指定用户最近 N 小时内的同类告警记录."""
         with self._cursor() as cursor:
-            sql = """
+            cursor.execute(
+                """
                 SELECT * FROM alert_logs
-                WHERE market_hash_name = ? AND alert_type = ?
+                WHERE user_id = ? AND market_hash_name = ? AND alert_type = ?
                   AND notified_at >= datetime('now', ?)
                 ORDER BY notified_at DESC
-            """
-            cursor.execute(sql, (market_hash_name, alert_type, f"-{hours} hours"))
+                """,
+                (user_id, market_hash_name, alert_type, f"-{hours} hours"),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     # ------------------------------------------------------------------
@@ -584,37 +588,39 @@ class Database:
     # ------------------------------------------------------------------
     def insert_extreme_snapshot(
         self,
+        user_id: int,
         market_hash_name: str,
         platform: str,
         price: float | None = None,
         quantity: int | None = None,
     ) -> None:
-        """写入极致追踪快照."""
+        """写入极致追踪快照（按 user_id 隔离）."""
         with self._cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO extreme_track_snapshots
-                (market_hash_name, platform, price, quantity)
-                VALUES (?, ?, ?, ?)
+                (user_id, market_hash_name, platform, price, quantity)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (market_hash_name, platform, price, quantity),
+                (user_id, market_hash_name, platform, price, quantity),
             )
 
     def get_latest_snapshot(
         self,
+        user_id: int,
         market_hash_name: str,
         platform: str,
     ) -> dict[str, Any] | None:
-        """获取指定饰品和平台的最新快照."""
+        """获取指定用户的最新快照."""
         with self._cursor() as cursor:
             cursor.execute(
                 """
                 SELECT * FROM extreme_track_snapshots
-                WHERE market_hash_name = ? AND platform = ?
+                WHERE user_id = ? AND market_hash_name = ? AND platform = ?
                 ORDER BY recorded_at DESC
                 LIMIT 1
                 """,
-                (market_hash_name, platform),
+                (user_id, market_hash_name, platform),
             )
             row = cursor.fetchone()
             return dict(row) if row else None
@@ -624,6 +630,7 @@ class Database:
     # ------------------------------------------------------------------
     def insert_extreme_alert(
         self,
+        user_id: int,
         market_hash_name: str,
         platform: str,
         alert_type: str,
@@ -634,17 +641,18 @@ class Database:
         curr_quantity: int | None = None,
         quantity_change_percent: float | None = None,
     ) -> None:
-        """写入极致追踪告警记录."""
+        """写入极致追踪告警记录（按 user_id 隔离）."""
         with self._cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO extreme_track_alerts
-                (market_hash_name, platform, alert_type,
+                (user_id, market_hash_name, platform, alert_type,
                  prev_price, curr_price, price_change_percent,
                  prev_quantity, curr_quantity, quantity_change_percent)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
+                    user_id,
                     market_hash_name,
                     platform,
                     alert_type,
@@ -659,44 +667,49 @@ class Database:
 
     def get_latest_extreme_alert(
         self,
+        user_id: int,
         market_hash_name: str,
         platform: str,
         alert_type: str,
     ) -> dict[str, Any] | None:
-        """获取指定饰品、平台、类型的最新极致追踪告警."""
+        """获取指定用户的最新极致追踪告警."""
         with self._cursor() as cursor:
             cursor.execute(
                 """
                 SELECT * FROM extreme_track_alerts
-                WHERE market_hash_name = ? AND platform = ? AND alert_type = ?
+                WHERE user_id = ? AND market_hash_name = ? AND platform = ? AND alert_type = ?
                 ORDER BY notified_at DESC
                 LIMIT 1
                 """,
-                (market_hash_name, platform, alert_type),
+                (user_id, market_hash_name, platform, alert_type),
             )
             row = cursor.fetchone()
             return dict(row) if row else None
 
     def get_recent_extreme_alerts(
         self,
+        user_id: int,
         market_hash_name: str,
         platform: str,
         alert_type: str,
         seconds: int = 0,
     ) -> list[dict[str, Any]]:
-        """查询最近 N 秒内的同类极致追踪告警记录."""
+        """查询指定用户最近 N 秒内的同类极致追踪告警."""
         with self._cursor() as cursor:
-            sql = """
+            cursor.execute(
+                """
                 SELECT * FROM extreme_track_alerts
-                WHERE market_hash_name = ? AND platform = ? AND alert_type = ?
+                WHERE user_id = ? AND market_hash_name = ? AND platform = ? AND alert_type = ?
                   AND notified_at >= datetime('now', ?)
                 ORDER BY notified_at DESC
-            """
-            cursor.execute(sql, (market_hash_name, platform, alert_type, f"-{seconds} seconds"))
+                """,
+                (user_id, market_hash_name, platform, alert_type, f"-{seconds} seconds"),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_extreme_alerts(
         self,
+        user_id: int,
         page: int = 1,
         limit: int = 20,
         alert_type: str | None = None,
@@ -704,9 +717,9 @@ class Database:
         end_date: str | None = None,
         market_hash_name: str | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
-        """分页查询极致追踪告警记录，返回 (数据列表, 总条数)."""
-        conditions = ["1 = 1"]
-        params: list[Any] = []
+        """分页查询指定用户的极致追踪告警记录."""
+        conditions = ["user_id = ?"]
+        params: list[Any] = [user_id]
         if alert_type:
             conditions.append("alert_type = ?")
             params.append(alert_type)
@@ -746,12 +759,13 @@ class Database:
 
     def get_extreme_alert_stats(
         self,
+        user_id: int,
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """返回极致追踪告警 (按天统计, 按类型统计)."""
-        conditions = ["1 = 1"]
-        params: list[Any] = []
+        """返回指定用户的极致追踪告警 (按天统计, 按类型统计)."""
+        conditions = ["user_id = ?"]
+        params: list[Any] = [user_id]
         if start_date:
             conditions.append("notified_at >= ?")
             params.append(f"{start_date} 00:00:00")
@@ -793,57 +807,76 @@ class Database:
     # ------------------------------------------------------------------
     def insert_watchlist_item(
         self,
+        user_id: int,
         market_hash_name: str,
         display_name: str | None = None,
         threshold_percent: float = 5.0,
         enabled: bool = True,
     ) -> None:
-        """插入监控清单项."""
+        """插入监控清单项（按 user_id 隔离）."""
         with self._cursor() as cursor:
             cursor.execute(
                 """
-                INSERT OR REPLACE INTO watchlist
-                (market_hash_name, display_name, threshold_percent, enabled, updated_at)
-                VALUES (?, ?, ?, ?, datetime('now'))
+                INSERT INTO watchlist
+                (user_id, market_hash_name, display_name, threshold_percent, enabled, updated_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT(user_id, market_hash_name) DO UPDATE SET
+                    display_name = excluded.display_name,
+                    threshold_percent = excluded.threshold_percent,
+                    enabled = excluded.enabled,
+                    updated_at = datetime('now')
                 """,
-                (market_hash_name, display_name, threshold_percent, 1 if enabled else 0),
+                (
+                    user_id,
+                    market_hash_name,
+                    display_name,
+                    threshold_percent,
+                    1 if enabled else 0,
+                ),
             )
 
-    def get_watchlist(self, enabled_only: bool = True) -> list[dict[str, Any]]:
-        """获取监控清单."""
+    def get_watchlist(
+        self, user_id: int, enabled_only: bool = True
+    ) -> list[dict[str, Any]]:
+        """获取指定用户的监控清单."""
         with self._cursor() as cursor:
             if enabled_only:
                 cursor.execute(
                     """
                     SELECT * FROM watchlist
-                    WHERE enabled = 1
+                    WHERE user_id = ? AND enabled = 1
                     ORDER BY created_at
-                    """
+                    """,
+                    (user_id,),
                 )
             else:
-                cursor.execute("SELECT * FROM watchlist ORDER BY created_at")
+                cursor.execute(
+                    "SELECT * FROM watchlist WHERE user_id = ? ORDER BY created_at",
+                    (user_id,),
+                )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_watchlist_item(
-        self, market_hash_name: str
+        self, user_id: int, market_hash_name: str
     ) -> dict[str, Any] | None:
-        """获取单个监控项."""
+        """获取指定用户的单个监控项."""
         with self._cursor() as cursor:
             cursor.execute(
-                "SELECT * FROM watchlist WHERE market_hash_name = ?",
-                (market_hash_name,),
+                "SELECT * FROM watchlist WHERE user_id = ? AND market_hash_name = ?",
+                (user_id, market_hash_name),
             )
             row = cursor.fetchone()
             return dict(row) if row else None
 
     def update_watchlist_item(
         self,
+        user_id: int,
         market_hash_name: str,
         display_name: str | None = None,
         threshold_percent: float | None = None,
         enabled: bool | None = None,
-    ) -> None:
-        """更新监控清单项."""
+    ) -> bool:
+        """更新监控清单项. 返回是否命中更新（防越权）."""
         fields: list[str] = []
         values: list[Any] = []
         if display_name is not None:
@@ -856,30 +889,34 @@ class Database:
             fields.append("enabled = ?")
             values.append(1 if enabled else 0)
         if not fields:
-            return
+            return False
         fields.append("updated_at = datetime('now')")
-        values.append(market_hash_name)
+        values.extend([user_id, market_hash_name])
         with self._cursor() as cursor:
             cursor.execute(
                 f"""
                 UPDATE watchlist
                 SET {', '.join(fields)}
-                WHERE market_hash_name = ?
+                WHERE user_id = ? AND market_hash_name = ?
                 """,
                 tuple(values),
             )
+            return cursor.rowcount > 0
 
-    def delete_watchlist_item(self, market_hash_name: str) -> None:
-        """删除监控清单项."""
+    def delete_watchlist_item(self, user_id: int, market_hash_name: str) -> bool:
+        """删除监控清单项. 返回是否真的删了."""
         with self._cursor() as cursor:
             cursor.execute(
-                "DELETE FROM watchlist WHERE market_hash_name = ?",
-                (market_hash_name,),
+                "DELETE FROM watchlist WHERE user_id = ? AND market_hash_name = ?",
+                (user_id, market_hash_name),
             )
+            return cursor.rowcount > 0
 
-    def get_watchlist_threshold(self, market_hash_name: str) -> float | None:
-        """获取指定饰品的阈值，不存在则返回 None."""
-        item = self.get_watchlist_item(market_hash_name)
+    def get_watchlist_threshold(
+        self, user_id: int, market_hash_name: str
+    ) -> float | None:
+        """获取指定饰品的阈值（按用户隔离），不存在则返回 None."""
+        item = self.get_watchlist_item(user_id, market_hash_name)
         if item:
             return float(item["threshold_percent"])
         return None
@@ -889,6 +926,7 @@ class Database:
     # ------------------------------------------------------------------
     def insert_extreme_track_config(
         self,
+        user_id: int,
         market_hash_name: str,
         platform: str,
         interval_seconds: int = 60,
@@ -903,19 +941,33 @@ class Database:
         quiet_hours_start: str | None = None,
         quiet_hours_end: str | None = None,
     ) -> None:
-        """插入或更新极致追踪配置."""
+        """插入或更新极致追踪配置（按 user_id 隔离）."""
         with self._cursor() as cursor:
             cursor.execute(
                 """
-                INSERT OR REPLACE INTO extreme_track_config
-                (market_hash_name, platform, interval_seconds, enabled,
+                INSERT INTO extreme_track_config
+                (user_id, market_hash_name, platform, interval_seconds, enabled,
                  price_track_enabled, price_change_mode, price_threshold_percent,
                  quantity_track_enabled, quantity_change_mode, quantity_threshold_percent,
                  alert_cooldown_seconds, quiet_hours_start, quiet_hours_end, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT(user_id, market_hash_name, platform) DO UPDATE SET
+                    interval_seconds = excluded.interval_seconds,
+                    enabled = excluded.enabled,
+                    price_track_enabled = excluded.price_track_enabled,
+                    price_change_mode = excluded.price_change_mode,
+                    price_threshold_percent = excluded.price_threshold_percent,
+                    quantity_track_enabled = excluded.quantity_track_enabled,
+                    quantity_change_mode = excluded.quantity_change_mode,
+                    quantity_threshold_percent = excluded.quantity_threshold_percent,
+                    alert_cooldown_seconds = excluded.alert_cooldown_seconds,
+                    quiet_hours_start = excluded.quiet_hours_start,
+                    quiet_hours_end = excluded.quiet_hours_end,
+                    updated_at = datetime('now')
                 """,
                 (
-                    market_hash_name, platform, interval_seconds, 1 if enabled else 0,
+                    user_id, market_hash_name, platform, interval_seconds,
+                    1 if enabled else 0,
                     1 if price_track_enabled else 0, price_change_mode, price_threshold_percent,
                     1 if quantity_track_enabled else 0, quantity_change_mode, quantity_threshold_percent,
                     alert_cooldown_seconds, quiet_hours_start, quiet_hours_end,
@@ -923,55 +975,47 @@ class Database:
             )
 
     def get_extreme_track_configs(
-        self, enabled_only: bool = True
+        self, user_id: int, enabled_only: bool = True
     ) -> list[dict[str, Any]]:
-        """获取极致追踪配置列表."""
+        """获取指定用户的极致追踪配置列表."""
+        extra_where = " AND etc.enabled = 1" if enabled_only else ""
         with self._cursor() as cursor:
-            if enabled_only:
-                cursor.execute(
-                    """
-                    SELECT etc.*, COALESCE(i.name, i.display_name) AS display_name,
-                           i.icon_url
-                    FROM extreme_track_config etc
-                    LEFT JOIN items i ON etc.market_hash_name = i.market_hash_name
-                    WHERE etc.enabled = 1
-                    ORDER BY etc.created_at
-                    """
-                )
-            else:
-                cursor.execute(
-                    """
-                    SELECT etc.*, COALESCE(i.name, i.display_name) AS display_name,
-                           i.icon_url
-                    FROM extreme_track_config etc
-                    LEFT JOIN items i ON etc.market_hash_name = i.market_hash_name
-                    ORDER BY etc.created_at
-                    """
-                )
+            cursor.execute(
+                f"""
+                SELECT etc.*, COALESCE(i.name, i.display_name) AS display_name,
+                       i.icon_url
+                FROM extreme_track_config etc
+                LEFT JOIN items i ON etc.market_hash_name = i.market_hash_name
+                WHERE etc.user_id = ?{extra_where}
+                ORDER BY etc.created_at
+                """,
+                (user_id,),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_extreme_track_config(
-        self, market_hash_name: str, platform: str
+        self, user_id: int, market_hash_name: str, platform: str
     ) -> dict[str, Any] | None:
-        """获取单个极致追踪配置."""
+        """获取单个极致追踪配置（按用户隔离）."""
         with self._cursor() as cursor:
             cursor.execute(
                 """
                 SELECT * FROM extreme_track_config
-                WHERE market_hash_name = ? AND platform = ?
+                WHERE user_id = ? AND market_hash_name = ? AND platform = ?
                 """,
-                (market_hash_name, platform),
+                (user_id, market_hash_name, platform),
             )
             row = cursor.fetchone()
             return dict(row) if row else None
 
     def update_extreme_track_config(
         self,
+        user_id: int,
         market_hash_name: str,
         platform: str,
         **kwargs: Any,
-    ) -> None:
-        """更新极致追踪配置."""
+    ) -> bool:
+        """更新指定用户的极致追踪配置. 返回是否命中更新."""
         allowed = {
             "interval_seconds", "enabled", "price_track_enabled",
             "price_change_mode", "price_threshold_percent",
@@ -989,31 +1033,33 @@ class Database:
             fields.append(f"{key} = ?")
             values.append(value)
         if not fields:
-            return
+            return False
         fields.append("updated_at = datetime('now')")
-        values.extend([market_hash_name, platform])
+        values.extend([user_id, market_hash_name, platform])
         with self._cursor() as cursor:
             cursor.execute(
                 f"""
                 UPDATE extreme_track_config
                 SET {', '.join(fields)}
-                WHERE market_hash_name = ? AND platform = ?
+                WHERE user_id = ? AND market_hash_name = ? AND platform = ?
                 """,
                 tuple(values),
             )
+            return cursor.rowcount > 0
 
     def delete_extreme_track_config(
-        self, market_hash_name: str, platform: str
-    ) -> None:
-        """删除极致追踪配置."""
+        self, user_id: int, market_hash_name: str, platform: str
+    ) -> bool:
+        """删除极致追踪配置. 返回是否真的删了."""
         with self._cursor() as cursor:
             cursor.execute(
                 """
                 DELETE FROM extreme_track_config
-                WHERE market_hash_name = ? AND platform = ?
+                WHERE user_id = ? AND market_hash_name = ? AND platform = ?
                 """,
-                (market_hash_name, platform),
+                (user_id, market_hash_name, platform),
             )
+            return cursor.rowcount > 0
 
     # ------------------------------------------------------------------
     # system_config 表操作
@@ -1040,63 +1086,17 @@ class Database:
             return row[0] if row else None
 
     # ------------------------------------------------------------------
-    # 默认数据导入
-    # ------------------------------------------------------------------
-    def import_default_watchlist(self, watchlist: list[dict]) -> None:
-        """首次启动时从 config.py 默认值导入监控清单."""
-        existing = self.get_watchlist(enabled_only=False)
-        if existing:
-            logger.info("watchlist 表已有数据，跳过默认导入")
-            return
-        for item in watchlist:
-            if isinstance(item, dict) and "name" in item:
-                self.insert_watchlist_item(
-                    market_hash_name=item["name"],
-                    display_name=item.get("display_name"),
-                    threshold_percent=item.get("threshold", 5.0),
-                    enabled=item.get("enabled", True),
-                )
-                logger.info(f"已导入默认监控项: {item['name']}")
-
-    def import_default_extreme_track(self, track_list: list[dict]) -> None:
-        """首次启动时从 config.py 默认值导入极致追踪配置."""
-        existing = self.get_extreme_track_configs(enabled_only=False)
-        if existing:
-            logger.info("extreme_track_config 表已有数据，跳过默认导入")
-            return
-        for item in track_list:
-            if not isinstance(item, dict):
-                continue
-            self.insert_extreme_track_config(
-                market_hash_name=item.get("market_hash_name", ""),
-                platform=item.get("platform", ""),
-                interval_seconds=item.get("interval_seconds", 60),
-                enabled=item.get("enabled", True),
-                price_track_enabled=item.get("price_track_enabled", True),
-                price_change_mode=item.get("price_change_mode", "any"),
-                price_threshold_percent=item.get("price_threshold_percent", 0.0),
-                quantity_track_enabled=item.get("quantity_track_enabled", True),
-                quantity_change_mode=item.get("quantity_change_mode", "any"),
-                quantity_threshold_percent=item.get("quantity_threshold_percent", 0.0),
-                alert_cooldown_seconds=item.get("alert_cooldown_seconds", 0),
-                quiet_hours_start=item.get("quiet_hours_start"),
-                quiet_hours_end=item.get("quiet_hours_end"),
-            )
-            logger.info(
-                f"已导入默认极致追踪: {item.get('market_hash_name')}@{item.get('platform')}"
-            )
-
-    # ------------------------------------------------------------------
     # 统计查询（Dashboard 用）
     # ------------------------------------------------------------------
-    def get_today_alert_count(self) -> int:
-        """查询今日告警数量."""
+    def get_today_alert_count(self, user_id: int) -> int:
+        """查询指定用户的今日告警数量."""
         with self._cursor() as cursor:
             cursor.execute(
                 """
                 SELECT COUNT(*) FROM alert_logs
-                WHERE notified_at >= date('now')
-                """
+                WHERE user_id = ? AND notified_at >= date('now')
+                """,
+                (user_id,),
             )
             row = cursor.fetchone()
             return row[0] if row else 0
@@ -1150,6 +1150,7 @@ class Database:
     # ------------------------------------------------------------------
     def get_alerts(
         self,
+        user_id: int,
         page: int = 1,
         limit: int = 20,
         alert_type: str | None = None,
@@ -1157,9 +1158,9 @@ class Database:
         end_date: str | None = None,
         market_hash_name: str | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
-        """分页查询告警记录，返回 (数据列表, 总条数)."""
-        conditions = ["1 = 1"]
-        params: list[Any] = []
+        """分页查询指定用户的告警记录."""
+        conditions = ["a.user_id = ?"]
+        params: list[Any] = [user_id]
         if alert_type:
             conditions.append("alert_type = ?")
             params.append(alert_type)
@@ -1176,20 +1177,19 @@ class Database:
         where_clause = " AND ".join(conditions)
 
         with self._cursor() as cursor:
-            # 总条数
             cursor.execute(
                 f"SELECT COUNT(*) FROM alert_logs a WHERE {where_clause}",
                 tuple(params),
             )
             total = cursor.fetchone()[0]
 
-            # 分页数据
             offset = (page - 1) * limit
             cursor.execute(
                 f"""
                 SELECT a.*, w.display_name AS display_name
                 FROM alert_logs a
-                LEFT JOIN watchlist w ON a.market_hash_name = w.market_hash_name
+                LEFT JOIN watchlist w
+                    ON a.market_hash_name = w.market_hash_name AND w.user_id = a.user_id
                 WHERE {where_clause}
                 ORDER BY a.notified_at DESC
                 LIMIT ? OFFSET ?
@@ -1201,12 +1201,13 @@ class Database:
 
     def get_alert_stats(
         self,
+        user_id: int,
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """返回 (按天统计, 按类型统计)."""
-        conditions = ["1 = 1"]
-        params: list[Any] = []
+        """返回指定用户的告警 (按天统计, 按类型统计)."""
+        conditions = ["user_id = ?"]
+        params: list[Any] = [user_id]
         if start_date:
             conditions.append("notified_at >= ?")
             params.append(f"{start_date} 00:00:00")
@@ -1217,7 +1218,6 @@ class Database:
         where_clause = " AND ".join(conditions)
 
         with self._cursor() as cursor:
-            # 按天统计
             cursor.execute(
                 f"""
                 SELECT date(notified_at) AS date, alert_type, COUNT(*) AS count
@@ -1230,7 +1230,6 @@ class Database:
             )
             by_day = [dict(row) for row in cursor.fetchall()]
 
-            # 按类型统计
             cursor.execute(
                 f"""
                 SELECT 'all' AS date, alert_type, COUNT(*) AS count
@@ -1248,76 +1247,55 @@ class Database:
     # ------------------------------------------------------------------
     # watchlist 扩展查询
     # ------------------------------------------------------------------
-    def get_watchlist_count(self, enabled_only: bool = True) -> int:
-        """获取监控清单数量."""
+    def get_watchlist_count(self, user_id: int, enabled_only: bool = True) -> int:
+        """获取指定用户的监控清单数量."""
         with self._cursor() as cursor:
             if enabled_only:
                 cursor.execute(
-                    "SELECT COUNT(*) FROM watchlist WHERE enabled = 1"
+                    "SELECT COUNT(*) FROM watchlist WHERE user_id = ? AND enabled = 1",
+                    (user_id,),
                 )
             else:
-                cursor.execute("SELECT COUNT(*) FROM watchlist")
+                cursor.execute(
+                    "SELECT COUNT(*) FROM watchlist WHERE user_id = ?",
+                    (user_id,),
+                )
             row = cursor.fetchone()
             return row[0] if row else 0
 
     def get_watchlist_with_latest_price(
-        self, enabled_only: bool = True
+        self, user_id: int, enabled_only: bool = True
     ) -> list[dict[str, Any]]:
         """获取监控清单及其最新价格，附带24h变化和7天sparkline."""
         with self._cursor() as cursor:
-            if enabled_only:
-                cursor.execute(
-                    """
-                    SELECT w.*,
-                           pr.price AS latest_price,
-                           pr.platform,
-                           pr.recorded_at AS price_updated_at,
-                           i.icon_url
-                    FROM watchlist w
-                    LEFT JOIN (
-                        SELECT market_hash_name, platform, price, recorded_at
-                        FROM (
-                            SELECT market_hash_name, platform, price, recorded_at,
-                                   ROW_NUMBER() OVER (
-                                       PARTITION BY market_hash_name
-                                       ORDER BY recorded_at DESC, platform
-                                   ) AS rn
-                            FROM price_records
-                            WHERE price > 0
-                        ) ranked
-                        WHERE ranked.rn = 1
-                    ) pr ON w.market_hash_name = pr.market_hash_name
-                    LEFT JOIN items i ON w.market_hash_name = i.market_hash_name
-                    WHERE w.enabled = 1
-                    ORDER BY w.created_at
-                    """
-                )
-            else:
-                cursor.execute(
-                    """
-                    SELECT w.*,
-                           pr.price AS latest_price,
-                           pr.platform,
-                           pr.recorded_at AS price_updated_at,
-                           i.icon_url
-                    FROM watchlist w
-                    LEFT JOIN (
-                        SELECT market_hash_name, platform, price, recorded_at
-                        FROM (
-                            SELECT market_hash_name, platform, price, recorded_at,
-                                   ROW_NUMBER() OVER (
-                                       PARTITION BY market_hash_name
-                                       ORDER BY recorded_at DESC, platform
-                                   ) AS rn
-                            FROM price_records
-                            WHERE price > 0
-                        ) ranked
-                        WHERE ranked.rn = 1
-                    ) pr ON w.market_hash_name = pr.market_hash_name
-                    LEFT JOIN items i ON w.market_hash_name = i.market_hash_name
-                    ORDER BY w.created_at
-                    """
-                )
+            extra_where = " AND w.enabled = 1" if enabled_only else ""
+            cursor.execute(
+                f"""
+                SELECT w.*,
+                       pr.price AS latest_price,
+                       pr.platform,
+                       pr.recorded_at AS price_updated_at,
+                       i.icon_url
+                FROM watchlist w
+                LEFT JOIN (
+                    SELECT market_hash_name, platform, price, recorded_at
+                    FROM (
+                        SELECT market_hash_name, platform, price, recorded_at,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY market_hash_name
+                                   ORDER BY recorded_at DESC, platform
+                               ) AS rn
+                        FROM price_records
+                        WHERE price > 0
+                    ) ranked
+                    WHERE ranked.rn = 1
+                ) pr ON w.market_hash_name = pr.market_hash_name
+                LEFT JOIN items i ON w.market_hash_name = i.market_hash_name
+                WHERE w.user_id = ?{extra_where}
+                ORDER BY w.created_at
+                """,
+                (user_id,),
+            )
             rows = [dict(row) for row in cursor.fetchall()]
 
             if not rows:
@@ -1410,16 +1388,18 @@ class Database:
 
             return rows
 
-    def get_extreme_track_count(self, enabled_only: bool = True) -> int:
-        """获取极致追踪配置数量."""
+    def get_extreme_track_count(self, user_id: int, enabled_only: bool = True) -> int:
+        """获取指定用户的极致追踪配置数量."""
         with self._cursor() as cursor:
             if enabled_only:
                 cursor.execute(
-                    "SELECT COUNT(*) FROM extreme_track_config WHERE enabled = 1"
+                    "SELECT COUNT(*) FROM extreme_track_config WHERE user_id = ? AND enabled = 1",
+                    (user_id,),
                 )
             else:
                 cursor.execute(
-                    "SELECT COUNT(*) FROM extreme_track_config"
+                    "SELECT COUNT(*) FROM extreme_track_config WHERE user_id = ?",
+                    (user_id,),
                 )
             row = cursor.fetchone()
             return row[0] if row else 0
@@ -1595,14 +1575,15 @@ class Database:
             }
 
     def get_all_alerts(self) -> list[dict[str, Any]]:
-        """获取所有告警记录（用于基准价重算）."""
+        """获取所有告警记录（用于系统级基准价重算；带 user_id 以便上游分组处理）."""
         with self._cursor() as cursor:
             cursor.execute(
                 """
-                SELECT a.id, a.market_hash_name, a.current_price,
+                SELECT a.id, a.user_id, a.market_hash_name, a.current_price,
                        COALESCE(w.threshold_percent, 5.0) AS threshold_percent
                 FROM alert_logs a
-                LEFT JOIN watchlist w ON a.market_hash_name = w.market_hash_name
+                LEFT JOIN watchlist w
+                    ON a.market_hash_name = w.market_hash_name AND w.user_id = a.user_id
                 ORDER BY a.notified_at DESC
                 """
             )

@@ -8,12 +8,20 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from api.steamdt import (
     SteamDTBusinessError,
+    SteamDTClient,
+    SteamDTConfig,
     SteamDTError,
     SteamDTRateLimitError,
 )
+from config import MonitorConfig
 from core.trend_analyzer import TrendAnalyzer
 from storage.database import Database
-from web.deps import get_config, get_db, require_auth
+from web.deps import (
+    get_config,
+    get_current_user_steamdt_key,
+    get_db,
+    require_password_changed,
+)
 from web.schemas import TrendAnalysisResponse
 
 router = APIRouter(prefix="/kline", tags=["kline"])
@@ -59,6 +67,35 @@ def _normalize_kline(raw: list) -> list[dict[str, Any]]:
     return out
 
 
+def _get_steamdt_client(
+    request: Request, config: MonitorConfig, user_api_key: str | None
+) -> tuple[SteamDTClient, bool]:
+    """优先用用户 Key；否则回退系统级 client.
+
+    Returns:
+      (client, owned) — owned=True 表示用户级 client（用完需 close）
+    """
+    if user_api_key:
+        return (
+            SteamDTClient(
+                SteamDTConfig(
+                    api_key=user_api_key,
+                    base_url=config.api_base_url,
+                    timeout=config.request_timeout,
+                    max_retries=config.request_retry,
+                )
+            ),
+            True,
+        )
+    sys_client = getattr(request.app.state, "steamdt_client", None)
+    if sys_client is None:
+        raise HTTPException(
+            status_code=400,
+            detail="未配置 SteamDT API Key——请在用户中心填写个人 Key",
+        )
+    return sys_client, False
+
+
 @router.get("/{market_hash_name}")
 def get_kline(
     market_hash_name: str,
@@ -66,16 +103,12 @@ def get_kline(
     count: int = 30,
     platform: str = "ALL",
     request: Request = None,  # type: ignore[assignment]
-    user: dict = Depends(require_auth),
+    config: MonitorConfig = Depends(get_config),
+    user: dict = Depends(require_password_changed),
+    user_api_key: str | None = Depends(get_current_user_steamdt_key),
 ) -> dict[str, Any]:
-    """查询饰品 K 线数据.
-
-    参数:
-        period: 1=时K, 2=日K, 3=周K
-        count: 返回条数
-        platform: 平台过滤，默认 ALL
-    """
-    client = request.app.state.steamdt_client
+    """查询饰品 K 线数据（市场公共数据，但调 SteamDT 优先用用户 Key）."""
+    client, owned = _get_steamdt_client(request, config, user_api_key)
     try:
         resp = client.get_item_kline(
             market_hash_name=market_hash_name,
@@ -94,6 +127,9 @@ def get_kline(
         )
     except SteamDTError as e:
         raise HTTPException(status_code=502, detail=str(e))
+    finally:
+        if owned:
+            client.close()
 
     raw = resp.get("data") or []
     series = _normalize_kline(raw)
@@ -113,9 +149,9 @@ def get_kline(
 @arbitrage_router.get("", response_model=list[dict[str, Any]])
 def get_arbitrage(
     db: Database = Depends(get_db),
-    user: dict = Depends(require_auth),
+    user: dict = Depends(require_password_changed),
 ) -> list[dict[str, Any]]:
-    """获取所有监控品的跨平台价差."""
+    """获取所有监控品的跨平台价差（市场公共数据）."""
     latest = db.get_latest_prices()
     grouped: dict[str, list[dict[str, Any]]] = {}
     for item in latest:
@@ -153,7 +189,7 @@ def get_arbitrage(
 def get_arbitrage_item(
     market_hash_name: str,
     db: Database = Depends(get_db),
-    user: dict = Depends(require_auth),
+    user: dict = Depends(require_password_changed),
 ) -> dict[str, Any]:
     """获取指定饰品的各平台价差明细."""
     platforms = db.get_price_by_platforms(market_hash_name)
@@ -189,7 +225,7 @@ def get_trends(
     market_hash_name: str,
     days: int = 30,
     db: Database = Depends(get_db),
-    user: dict = Depends(require_auth),
+    user: dict = Depends(require_password_changed),
 ) -> dict[str, Any]:
     """获取指定饰品的趋势分析.
 
