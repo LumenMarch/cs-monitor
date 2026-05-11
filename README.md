@@ -203,6 +203,18 @@ ADMIN_INITIAL_PASSWORD=
 
 ### 3. 运行主程序
 
+推荐用一键脚本（自带依赖同步、前端构建、.env 必填项校验）：
+
+```bash
+# 生产模式：构建前端 + 启动后端（http://localhost:8080）
+./scripts/run.sh
+
+# 开发模式：后端 + Vite dev 并行（前端 http://localhost:5173 带热更新）
+./scripts/dev.sh
+```
+
+也可以手动启动：
+
 ```bash
 # 首次或前端代码更新后构建一次
 cd frontend && bun run build && cd ..
@@ -259,20 +271,7 @@ open http://localhost:8080
 **健康检查**：每 30 秒探测 `/api/health`，连续 3 次失败自动重启。
 **停止**：`docker-compose down`。
 
-### 6. 开发模式（前端热更新）
-
-```bash
-# 终端 1：启动后端
-uv run python main.py
-
-# 终端 2：启动 Vite 开发服务器
-cd frontend
-bun run dev
-```
-
-前端开发服务器跑在 `http://localhost:5173`，通过 Vite 代理打到后端 API。改完别忘了 `bun run build` 让生产环境生效。
-
-### 7. 测试与检查
+### 6. 测试与检查
 
 ```bash
 # Python 后端：132 个测试
