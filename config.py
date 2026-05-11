@@ -42,17 +42,23 @@ class MonitorConfig:
     web_host: str = "0.0.0.0"
     web_port: int = 8080
 
-    # === 认证配置 ===
-    admin_password: str = "admin"
-    jwt_secret: str = "change-me-in-production"
-    jwt_expiry_hours: int = 24
+    # === 多用户认证配置 ===
+    master_encryption_key: str = ""
+    jwt_secret_key: str = ""
+    jwt_expire_hours: int = 24
+    admin_initial_password: str = ""
 
     # === 极致追踪配置 ===
     extreme_track_list: list = field(default_factory=list)
 
-    def is_default_credentials(self) -> bool:
-        """检查是否使用了默认的弱密码或 JWT secret."""
-        return self.admin_password == "admin" or self.jwt_secret == "change-me-in-production"
+    def validate_security(self) -> list[str]:
+        """检查多用户模式下必填的安全配置项. 返回缺失项列表."""
+        missing: list[str] = []
+        if not self.master_encryption_key:
+            missing.append("MASTER_ENCRYPTION_KEY")
+        if not self.jwt_secret_key:
+            missing.append("JWT_SECRET_KEY")
+        return missing
 
     @classmethod
     def from_env(cls) -> "MonitorConfig":
@@ -68,9 +74,10 @@ class MonitorConfig:
             timezone=getenv("TIMEZONE", "Asia/Shanghai"),
             web_host=getenv("WEB_HOST", "0.0.0.0"),
             web_port=int(getenv("WEB_PORT", "8080")),
-            admin_password=getenv("ADMIN_PASSWORD", "admin"),
-            jwt_secret=getenv("JWT_SECRET", "change-me-in-production"),
-            jwt_expiry_hours=int(getenv("JWT_EXPIRY_HOURS", "24")),
+            master_encryption_key=getenv("MASTER_ENCRYPTION_KEY", ""),
+            jwt_secret_key=getenv("JWT_SECRET_KEY", ""),
+            jwt_expire_hours=int(getenv("JWT_EXPIRE_HOURS", "24")),
+            admin_initial_password=getenv("ADMIN_INITIAL_PASSWORD", ""),
             notify_channel=getenv("NOTIFY_CHANNEL", "wecom"),
             wecom_webhook_url=getenv("WECOM_WEBHOOK_URL", ""),
             telegram_bot_token=getenv("TELEGRAM_BOT_TOKEN", ""),

@@ -1,6 +1,17 @@
 """Web routers package."""
 
-from web.routers import alerts, archive, auth, dashboard, extreme_track, kline, prices, settings, watchlist
+from web.routers import (
+    alerts,
+    archive,
+    auth,
+    dashboard,
+    extreme_track,
+    kline,
+    prices,
+    settings,
+    users,
+    watchlist,
+)
 
 __all__ = [
     "alerts",
@@ -11,5 +22,6 @@ __all__ = [
     "kline",
     "prices",
     "settings",
+    "users",
     "watchlist",
 ]

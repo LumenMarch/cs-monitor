@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import shutil
 import sqlite3
 import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
 
-from storage.models import ALL_TABLES
+from storage.models import ALL_TABLES, SCHEMA_VERSION
 
 
 class Database:
@@ -20,6 +22,8 @@ class Database:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._local = threading.local()
+        # 多用户改造：若检测到旧 schema（无 user_id 列），自动备份并清空重建
+        self._maybe_reset_legacy_schema()
         self._init_tables()
 
     def _connect(self) -> sqlite3.Connection:
@@ -59,31 +63,219 @@ class Database:
         with self._cursor() as cursor:
             for sql in ALL_TABLES:
                 cursor.execute(sql)
+            cursor.execute(
+                """
+                INSERT INTO system_config (key, value, updated_at)
+                VALUES ('schema_version', ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (str(SCHEMA_VERSION),),
+            )
+        logger.info(f"数据库表初始化完成 (schema_version={SCHEMA_VERSION})")
 
-        # 迁移：为旧 items 表添加 name / last_synced_at 列
-        self._migrate_items_table()
+    def _maybe_reset_legacy_schema(self) -> None:
+        """检测旧 schema（单租户、无 user_id 列），自动备份后清空重建.
 
-        logger.info("数据库表初始化完成")
+        触发条件（任一即为旧库）：
+          - 存在 watchlist 表但缺 user_id 列
+          - 存在 alert_logs 表但缺 user_id 列
+          - 存在 extreme_track_config 表但缺 user_id 列
 
-    def _migrate_items_table(self) -> None:
-        """为旧版 items 表添加新列（如果不存在）."""
-        with self._cursor() as cursor:
-            cursor.execute("PRAGMA table_info(items)")
-            columns = {row[1] for row in cursor.fetchall()}
+        全新部署（无 .db 文件）会跳过这一步.
+        """
+        if not self.db_path.exists():
+            return  # 全新部署
 
-            if "name" not in columns:
-                cursor.execute("ALTER TABLE items ADD COLUMN name TEXT")
-                logger.info("items 表已添加 name 列")
+        try:
+            probe = sqlite3.connect(str(self.db_path))
+            probe.row_factory = sqlite3.Row
+            cursor = probe.cursor()
 
-            if "last_synced_at" not in columns:
+            def _table_exists(name: str) -> bool:
                 cursor.execute(
-                    "ALTER TABLE items ADD COLUMN last_synced_at TIMESTAMP"
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    (name,),
                 )
-                logger.info("items 表已添加 last_synced_at 列")
+                return cursor.fetchone() is not None
 
-            if "icon_url" not in columns:
-                cursor.execute("ALTER TABLE items ADD COLUMN icon_url TEXT")
-                logger.info("items 表已添加 icon_url 列")
+            def _has_column(table: str, column: str) -> bool:
+                cursor.execute(f"PRAGMA table_info({table})")
+                return any(row[1] == column for row in cursor.fetchall())
+
+            legacy = False
+            for table in ("watchlist", "alert_logs", "extreme_track_config"):
+                if _table_exists(table) and not _has_column(table, "user_id"):
+                    legacy = True
+                    break
+            probe.close()
+        except sqlite3.Error as exc:
+            logger.warning(f"schema 探测失败，跳过遗留检测: {exc}")
+            return
+
+        if not legacy:
+            return
+
+        # 备份旧 db 到 data/legacy_<ts>/
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        backup_dir = self.db_path.parent / f"legacy_{ts}"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        for suffix in ("", "-shm", "-wal"):
+            src = Path(str(self.db_path) + suffix)
+            if src.exists():
+                shutil.move(str(src), str(backup_dir / src.name))
+
+        logger.warning(
+            f"⚠️ 检测到旧版单用户 schema，已备份到 {backup_dir}，"
+            "将以多用户 schema 重新建库（原有 watchlist / 告警 / 极致追踪配置不会迁移）"
+        )
+
+    # ==================================================================
+    # users 表操作（多用户认证）
+    # ==================================================================
+    def create_user(
+        self,
+        username: str,
+        password_hash: str,
+        *,
+        role: str = "user",
+        must_change_password: bool = False,
+        steamdt_api_key_encrypted: str | None = None,
+    ) -> int:
+        """创建新用户，返回 user id. 若 username 重复抛 sqlite3.IntegrityError."""
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO users (
+                    username, password_hash, role,
+                    steamdt_api_key_encrypted, must_change_password, is_active
+                ) VALUES (?, ?, ?, ?, ?, 1)
+                """,
+                (
+                    username,
+                    password_hash,
+                    role,
+                    steamdt_api_key_encrypted,
+                    1 if must_change_password else 0,
+                ),
+            )
+            user_id = cursor.lastrowid
+            assert user_id is not None
+            return user_id
+
+    def get_user_by_username(self, username: str) -> dict[str, Any] | None:
+        with self._cursor() as cursor:
+            cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_user_by_id(self, user_id: int) -> dict[str, Any] | None:
+        with self._cursor() as cursor:
+            cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def list_users(self, *, include_inactive: bool = False) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM users"
+        if not include_inactive:
+            sql += " WHERE is_active = 1"
+        sql += " ORDER BY id ASC"
+        with self._cursor() as cursor:
+            cursor.execute(sql)
+            return [dict(r) for r in cursor.fetchall()]
+
+    def list_users_with_steamdt_key(self) -> list[dict[str, Any]]:
+        """供调度器循环使用：仅返回激活且配置了 SteamDT Key 的用户."""
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM users
+                WHERE is_active = 1
+                  AND steamdt_api_key_encrypted IS NOT NULL
+                  AND steamdt_api_key_encrypted != ''
+                ORDER BY id ASC
+                """
+            )
+            return [dict(r) for r in cursor.fetchall()]
+
+    def count_admins(self) -> int:
+        with self._cursor() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1"
+            )
+            return int(cursor.fetchone()[0])
+
+    def update_user_password(
+        self,
+        user_id: int,
+        password_hash: str,
+        *,
+        must_change_password: bool | None = False,
+    ) -> bool:
+        """更新密码哈希.
+
+        Args:
+          must_change_password:
+            - False (默认): 改密后清掉 must_change 标记（用户主动改密场景）
+            - True: 改密后强制下次登录再改一次（管理员重置密码场景）
+            - None: 不动 must_change_password 字段
+        """
+        with self._cursor() as cursor:
+            if must_change_password is None:
+                cursor.execute(
+                    "UPDATE users SET password_hash = ? WHERE id = ?",
+                    (password_hash, user_id),
+                )
+            else:
+                cursor.execute(
+                    """
+                    UPDATE users
+                    SET password_hash = ?, must_change_password = ?
+                    WHERE id = ?
+                    """,
+                    (password_hash, 1 if must_change_password else 0, user_id),
+                )
+            return cursor.rowcount > 0
+
+    def update_user_role(self, user_id: int, role: str) -> bool:
+        with self._cursor() as cursor:
+            cursor.execute(
+                "UPDATE users SET role = ? WHERE id = ?", (role, user_id)
+            )
+            return cursor.rowcount > 0
+
+    def set_user_active(self, user_id: int, active: bool) -> bool:
+        with self._cursor() as cursor:
+            cursor.execute(
+                "UPDATE users SET is_active = ? WHERE id = ?",
+                (1 if active else 0, user_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_user_steamdt_key_encrypted(
+        self, user_id: int, token: str | None
+    ) -> bool:
+        """写入加密后的 SteamDT API Key。token=None 表示清空."""
+        with self._cursor() as cursor:
+            cursor.execute(
+                "UPDATE users SET steamdt_api_key_encrypted = ? WHERE id = ?",
+                (token, user_id),
+            )
+            return cursor.rowcount > 0
+
+    def update_user_last_login(self, user_id: int) -> None:
+        with self._cursor() as cursor:
+            cursor.execute(
+                "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (user_id,),
+            )
+
+    def delete_user(self, user_id: int) -> bool:
+        """物理删除用户 + 级联删除其所有隔离数据（FK ON DELETE CASCADE）."""
+        with self._cursor() as cursor:
+            cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            return cursor.rowcount > 0
 
     # ------------------------------------------------------------------
     # items 表操作

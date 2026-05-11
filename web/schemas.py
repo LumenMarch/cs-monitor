@@ -17,7 +17,8 @@ class HealthResponse(BaseModel):
 class LoginRequest(BaseModel):
     """登录请求."""
 
-    password: str = Field(..., min_length=1, description="管理员密码")
+    username: str = Field(..., min_length=1, description="用户名")
+    password: str = Field(..., min_length=1, description="密码")
 
 
 class LoginResponse(BaseModel):
@@ -25,6 +26,10 @@ class LoginResponse(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
+    expires_in: int = Field(..., description="令牌有效期秒数")
+    user_id: int
+    username: str
+    role: str
     requires_password_change: bool = False
 
 
@@ -32,7 +37,65 @@ class ChangePasswordRequest(BaseModel):
     """修改密码请求."""
 
     current_password: str = Field(..., min_length=1, description="当前密码")
-    new_password: str = Field(..., min_length=6, description="新密码")
+    new_password: str = Field(..., min_length=8, description="新密码（至少 8 位）")
+
+
+class MeResponse(BaseModel):
+    """当前登录用户信息."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    role: str
+    must_change_password: bool = False
+    has_steamdt_key: bool = False
+    created_at: datetime | None = None
+    last_login_at: datetime | None = None
+
+
+class SteamdtKeyUpdateRequest(BaseModel):
+    """更新当前用户的 SteamDT API Key."""
+
+    api_key: str = Field(..., min_length=1, description="SteamDT API Key（明文）")
+
+
+class UserResponse(BaseModel):
+    """用户信息（管理员视图，不含密码哈希与密钥明文）."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    role: str
+    is_active: bool = True
+    must_change_password: bool = False
+    has_steamdt_key: bool = False
+    created_at: datetime | None = None
+    last_login_at: datetime | None = None
+
+
+class UserCreateRequest(BaseModel):
+    """管理员创建用户."""
+
+    username: str = Field(..., min_length=3, max_length=64, description="用户名")
+    password: str = Field(..., min_length=8, description="初始密码（至少 8 位）")
+    role: str = Field("user", description="角色: admin / user")
+    must_change_password: bool = Field(True, description="首次登录强制改密")
+
+
+class UserUpdateRequest(BaseModel):
+    """管理员更新用户."""
+
+    role: str | None = Field(None, description="角色: admin / user")
+    is_active: bool | None = Field(None, description="是否启用")
+
+
+class AdminResetPasswordRequest(BaseModel):
+    """管理员重置某用户密码."""
+
+    new_password: str = Field(..., min_length=8, description="新密码（至少 8 位）")
+    must_change_password: bool = Field(True, description="重置后强制其改密")
 
 
 class VolatileItem(BaseModel):

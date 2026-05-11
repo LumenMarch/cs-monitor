@@ -56,57 +56,58 @@
 
 ```
 cs-monitor/
-├── main.py                 # 主程序入口（调度器 + FastAPI Web 服务）
-├── config.py               # 配置类（dataclass，默认值兜底）
-├── requirements.txt        # Python 依赖
-├── .env.example            # 环境变量模板
+├── main.py # 主程序入口（调度器 + FastAPI Web 服务）
+├── config.py # 配置类（dataclass，默认值兜底）
+├── pyproject.toml # Python 项目元数据 + 依赖（uv 管理）
+├── uv.lock # 锁定的依赖版本（提交到 git）
+├── .env.example # 环境变量模板
 ├── .gitignore
-├── CLAUDE.md               # AI Agent 开发工作流规范
-├── architecture.md         # 架构设计文档
-├── PRD.md                  # 产品需求文档
-├── task.json               # 开发任务清单
-├── progress.txt            # 开发进度日志
+├── CLAUDE.md # AI Agent 开发工作流规范
+├── architecture.md # 架构设计文档
+├── PRD.md # 产品需求文档
+├── task.json # 开发任务清单
+├── progress.txt # 开发进度日志
 ├── api/
-│   └── steamdt.py          # SteamDT API 封装（重试、延迟、异常处理）
+│ └── steamdt.py # SteamDT API 封装（重试、延迟、异常处理）
 ├── core/
-│   ├── monitor.py          # 普通监控：价格采集
-│   ├── analyzer.py         # 波动分析 + 告警检测
-│   ├── scheduler.py        # APScheduler 定时任务管理
-│   └── extreme_tracker.py  # 极致追踪：高频单品狙击
-├── web/                    # 🆕 FastAPI Web 层
-│   ├── app.py              # FastAPI 应用入口
-│   ├── schemas.py          # Pydantic 模型
-│   ├── ws_manager.py       # WebSocket 管理
-│   └── routers/            # RESTful API 路由
-├── frontend/               # 🆕 Vue 3 前端
-│   ├── package.json
-│   ├── vite.config.ts
-│   └── src/
-│       ├── views/          # 页面（Dashboard/Watchlist/Alerts/...）
-│       ├── components/     # 组件（StatCard/PriceTable/PriceChart/...）
-│       ├── stores/         # Pinia 状态管理
-│       └── api/            # axios 封装
+│ ├── monitor.py # 普通监控：价格采集
+│ ├── analyzer.py # 波动分析 + 告警检测
+│ ├── scheduler.py # APScheduler 定时任务管理
+│ └── extreme_tracker.py # 极致追踪：高频单品狙击
+├── web/ # 🆕 FastAPI Web 层
+│ ├── app.py # FastAPI 应用入口
+│ ├── schemas.py # Pydantic 模型
+│ ├── ws_manager.py # WebSocket 管理
+│ └── routers/ # RESTful API 路由
+├── frontend/ # 🆕 Vue 3 前端
+│ ├── package.json
+│ ├── vite.config.ts
+│ └── src/
+│ ├── views/ # 页面（Dashboard/Watchlist/Alerts/...）
+│ ├── components/ # 组件（StatCard/PriceTable/PriceChart/...）
+│ ├── stores/ # Pinia 状态管理
+│ └── api/ # axios 封装
 ├── notify/
-│   ├── base.py             # 通知渠道抽象基类
-│   ├── manager.py          # 通知管理器（格式化 + 路由）
-│   ├── wecom.py            # 企业微信机器人
-│   ├── telegram.py         # Telegram Bot
-│   └── serverchan.py       # Server 酱
+│ ├── base.py # 通知渠道抽象基类
+│ ├── manager.py # 通知管理器（格式化 + 路由）
+│ ├── wecom.py # 企业微信机器人
+│ ├── telegram.py # Telegram Bot
+│ └── serverchan.py # Server 酱
 ├── storage/
-│   ├── models.py           # 数据库表结构定义
-│   └── database.py         # SQLite 连接与 CRUD 封装
+│ ├── models.py # 数据库表结构定义
+│ └── database.py # SQLite 连接与 CRUD 封装
 ├── utils/
-│   └── logger.py           # loguru 日志配置
+│ └── logger.py # loguru 日志配置
 ├── data/
-│   └── logs/               # 日志文件输出目录
+│ └── logs/ # 日志文件输出目录
 └── tests/
-    ├── test_api.py
-    ├── test_monitor.py
-    ├── test_analyzer.py
-    ├── test_extreme_tracker.py
-    ├── test_notify.py
-    ├── test_storage.py
-    └── test_web_api.py     # 🆕 Web API 测试
+ ├── test_api.py
+ ├── test_monitor.py
+ ├── test_analyzer.py
+ ├── test_extreme_tracker.py
+ ├── test_notify.py
+ ├── test_storage.py
+ └── test_web_api.py # 🆕 Web API 测试
 ```
 
 ---
@@ -122,7 +123,7 @@ cd cs-monitor
 ./init.sh
 ```
 
-`init.sh` 会创建 `.venv` 虚拟环境、安装 Python 依赖，并自动安装前端 npm 依赖。
+`init.sh` 会调用 `uv sync` 自动创建 `.venv`、安装 Python 依赖（按 `pyproject.toml` + `uv.lock`），并自动安装前端 npm 依赖。前置依赖：[uv](https://docs.astral.sh/uv/)（`brew install uv` 或 `curl -LsSf https://astral.sh/uv/install.sh | sh`）。
 
 ### 2. 配置环境变量
 
@@ -140,7 +141,7 @@ cp .env.example .env
 cd frontend && npm run build && cd ..
 
 # 启动主程序
-python main.py
+uv run python main.py
 ```
 
 首次启动会立即执行一次价格采集，随后：
@@ -184,7 +185,7 @@ docker-compose down
 
 ```bash
 # 终端 1：启动后端
-python main.py
+uv run python main.py
 
 # 终端 2：启动前端开发服务器
 cd frontend
@@ -215,8 +216,8 @@ v2.0 后监控清单已迁移到数据库，可通过 **Web 仪表盘** 或 **AP
 
 ```python
 watchlist = [
-    {"name": "AK-47 | Redline (Field-Tested)", "threshold": 5.0},
-    {"name": "AWP | Asiimov (Field-Tested)", "threshold": 5.0},
+ {"name": "AK-47 | Redline (Field-Tested)", "threshold": 5.0},
+ {"name": "AWP | Asiimov (Field-Tested)", "threshold": 5.0},
 ]
 ```
 

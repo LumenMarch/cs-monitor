@@ -30,12 +30,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 
 WORKDIR /app
 
-# 先复制依赖文件，利用 Docker 层缓存
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# 安装 uv（来自官方静态镜像，体积小、无 Python 依赖）
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# 先复制依赖元数据，利用 Docker 层缓存
+COPY pyproject.toml uv.lock ./
+
+# 安装依赖到系统 Python（不创建 .venv，运行时直接用 python）
+ENV UV_PROJECT_ENVIRONMENT=/usr/local \
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1
+RUN uv sync --frozen --no-install-project --no-dev
 
 # 复制后端源码
 COPY . .
+
+# 安装项目本身（无需重装依赖）
+RUN uv sync --frozen --no-dev
 
 # 将前端构建产物复制到正确位置（与 web/app.py 查找路径一致）
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist

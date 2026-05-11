@@ -64,3 +64,13 @@ frontend/dist/
 # SQLite WAL
 *.db-shm
 *.db-wal
+
+# Claude Code local settings
+.claude/
+
+# Legacy DB backups produced by schema-reset
+data/legacy_*/
+
+# Fork local-only progress notes
+progress.txt
+.progress.local.txt

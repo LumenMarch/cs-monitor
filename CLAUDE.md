@@ -19,10 +19,10 @@ Every new agent session MUST follow this workflow:
 ```
 
 This will:
-- Create Python virtual environment (`.venv`) if not exists
-- Install all Python dependencies from `requirements.txt`
+- Run `uv sync` to install/update Python dependencies from `pyproject.toml` + `uv.lock`
+- Auto-create the `.venv` if missing (uv-managed)
 - Check Node.js / npm availability for frontend tasks (if needed)
-- Verify Python 3.12+ is available
+- Verify Python 3.12+ is available (uv will auto-download if absent)
 
 **DO NOT skip this step.** Ensure the environment is ready before proceeding.
 
@@ -51,39 +51,39 @@ After implementation, verify ALL steps in the task:
 **强制测试要求（Testing Requirements - MANDATORY）：**
 
 1. **核心逻辑修改**（API 封装、数据分析、调度器、通知模块）：
-   - **必须运行相关单元测试！** 使用 `python -m pytest tests/` 或 `python -m unittest`
-   - 验证边界条件（空数据、API 失败、阈值边界等）
-   - 使用 mock 测试外部依赖
+ - **必须运行相关单元测试！** 使用 `uv run pytest tests/` 或 `uv run python -m unittest`
+ - 验证边界条件（空数据、API 失败、阈值边界等）
+ - 使用 mock 测试外部依赖
 
 2. **Web API 任务**（Task 11+ 涉及 web/ 目录）：
-   - 使用 `python -m py_compile` 检查语法
-   - 启动服务后用 curl 或浏览器测试端点
-   - 运行 `python -m pytest tests/test_web_api.py` 如有新增测试
+ - 使用 `uv run python -m py_compile` 检查语法
+ - 启动服务后用 curl 或浏览器测试端点
+ - 运行 `uv run pytest tests/test_web_api.py` 如有新增测试
 
 3. **前端任务**（Task 15+ 涉及 frontend/ 目录）：
-   - 运行 `cd frontend && npm run build` 检查编译
-   - 运行 `cd frontend && npm run lint` 检查代码规范（如有配置）
-   - **v2.1 前端优化任务（Task 23-30）额外要求**：
-     - 验证 light / dark 两种主题下视觉正常（切换后无闪烁、无硬编码色值泄露）
-     - 验证骨架屏在数据加载时正确显示，数据到达后平滑切换
-     - 验证响应式：375px（移动端抽屉）、1024px（桌面展开）、1440px+（最大宽度居中）
-     - 验证所有新字符串已走 `vue-i18n` `$t()`（如已实现 i18n）
-     - 验证 aria-label、tab 导航、焦点环等无障碍属性已添加
+ - 运行 `cd frontend && npm run build` 检查编译
+ - 运行 `cd frontend && npm run lint` 检查代码规范（如有配置）
+ - **v2.1 前端优化任务（Task 23-30）额外要求**：
+ - 验证 light / dark 两种主题下视觉正常（切换后无闪烁、无硬编码色值泄露）
+ - 验证骨架屏在数据加载时正确显示，数据到达后平滑切换
+ - 验证响应式：375px（移动端抽屉）、1024px（桌面展开）、1440px+（最大宽度居中）
+ - 验证所有新字符串已走 `vue-i18n` `$t`（如已实现 i18n）
+ - 验证 aria-label、tab 导航、焦点环等无障碍属性已添加
 
 4. **小幅度代码修改**（修复 bug、调整日志、添加辅助函数）：
-   - 可以使用 `python -m py_compile` 检查语法
-   - 运行 `ruff check .` 或 `mypy` 检查代码规范（如已安装）
+ - 可以使用 `uv run python -m py_compile` 检查语法
+ - 运行 `uv run ruff check .` 或 `uv run mypy` 检查代码规范
 
 5. **所有修改必须通过**：
-   - `python -m py_compile <modified_files>` 无语法错误
-   - 相关单元测试通过
-   - 核心流程可以正常启动（如修改了 main.py，运行 `python main.py` 测试初始化）
+ - `uv run python -m py_compile <modified_files>` 无语法错误
+ - 相关单元测试通过
+ - 核心流程可以正常启动（如修改了 main.py，运行 `uv run python main.py` 测试初始化）
 
 **测试清单：**
 - [ ] 代码没有语法错误
 - [ ] 新增/修改的逻辑有测试覆盖（核心模块）
 - [ ] 单元测试通过
-- [ ] 主程序能正常初始化（运行 `python main.py` 不报错退出）
+- [ ] 主程序能正常初始化（运行 `uv run python main.py` 不报错退出）
 - [ ] Web API 可正常访问（如修改了 web/，curl /api/health 返回 200）
 
 ### Step 5: Update Progress
@@ -132,31 +132,31 @@ git commit -m "[task title] - completed"
 ### 需要停止任务并请求人工帮助的情况：
 
 1. **缺少环境配置**：
-   - `.env` 需要填写真实的 SteamDT API Key
-   - 通知渠道的 Webhook URL / Bot Token 需要人工配置
-   - 外部 API 服务需要开通账号或购买套餐
-   - 前端任务需要 Node.js 18+ 环境未安装
+ - `.env` 需要填写真实的 SteamDT API Key
+ - 通知渠道的 Webhook URL / Bot Token 需要人工配置
+ - 外部 API 服务需要开通账号或购买套餐
+ - 前端任务需要 Node.js 18+ 环境未安装
 
 2. **外部依赖不可用**：
-   - SteamDT API 服务宕机或无法访问
-   - 通知渠道（企微/Telegram）服务异常
-   - 需要付费升级 API 套餐
-   - npm 包安装失败（网络问题）
+ - SteamDT API 服务宕机或无法访问
+ - 通知渠道（企微/Telegram）服务异常
+ - 需要付费升级 API 套餐
+ - npm 包安装失败（网络问题）
 
 3. **测试无法进行**：
-   - 需要真实的 API Key 才能运行集成测试
-   - 功能依赖外部系统尚未部署
-   - 网络环境限制（如防火墙）
-   - 前端构建工具链配置异常
+ - 需要真实的 API Key 才能运行集成测试
+ - 功能依赖外部系统尚未部署
+ - 网络环境限制（如防火墙）
+ - 前端构建工具链配置异常
 
 4. **API 定义不明确**：
-   - 如果在实现 SteamDT API 封装时对接口参数、响应格式有疑问，先查阅 `api/API_REFERENCE.md` 和 https://doc.steamdt.com/llms.txt
-   - 若文档与实际行为不符，采用防御性编程（默认值、空值检查、try-except）
+ - 如果在实现 SteamDT API 封装时对接口参数、响应格式有疑问，先查阅 `api/API_REFERENCE.md` 和 https://doc.steamdt.com/llms.txt
+ - 若文档与实际行为不符，采用防御性编程（默认值、空值检查、try-except）
 
 5. **前后端数据不同步**：
-   - `config.py` 中的 watchlist 与 DB 表数据不一致
-   - 修改了 DB schema 但前端未同步适配
-   - WebSocket 连接无法建立（端口冲突、防火墙）
+ - `config.py` 中的 watchlist 与 DB 表数据不一致
+ - 修改了 DB schema 但前端未同步适配
+ - WebSocket 连接无法建立（端口冲突、防火墙）
 
 ### 阻塞时的正确操作：
 
@@ -198,52 +198,56 @@ git commit -m "[task title] - completed"
 
 ```
 /
-├── CLAUDE.md          # This file - workflow instructions
-├── architecture.md    # Architecture design document
-├── task.json          # Task definitions (source of truth)
-├── progress.txt       # Progress log from each session
-├── init.sh            # Initialization script
-├── .env               # Environment variables (sensitive, not committed)
-├── .env.example       # Environment variables template
-├── config.py          # Configuration dataclasses
-├── main.py            # Application entry point (scheduler + FastAPI)
-├── requirements.txt   # Python dependencies
-├── api/               # SteamDT API client
-├── core/              # Monitor, analyzer, scheduler, extreme tracker
-├── notify/            # Notification channels
-├── storage/           # SQLite database operations
-├── web/               # FastAPI web layer (routers, schemas, deps, ws)
-├── frontend/          # Vue 3 frontend (Vite + TypeScript + Naive UI)
-├── utils/             # Logger and utilities
-├── data/              # SQLite database files
-└── tests/             # Unit tests
+├── CLAUDE.md # This file - workflow instructions
+├── architecture.md # Architecture design document
+├── task.json # Task definitions (source of truth)
+├── progress.txt # Progress log from each session
+├── init.sh # Initialization script
+├── .env # Environment variables (sensitive, not committed)
+├── .env.example # Environment variables template
+├── config.py # Configuration dataclasses
+├── main.py # Application entry point (scheduler + FastAPI)
+├── pyproject.toml # Python project metadata + dependencies (uv-managed)
+├── uv.lock # Locked dependency versions (committed)
+├── api/ # SteamDT API client
+├── core/ # Monitor, analyzer, scheduler, extreme tracker
+├── notify/ # Notification channels
+├── storage/ # SQLite database operations
+├── web/ # FastAPI web layer (routers, schemas, deps, ws)
+├── frontend/ # Vue 3 frontend (Vite + TypeScript + Naive UI)
+├── utils/ # Logger and utilities
+├── data/ # SQLite database files
+└── tests/ # Unit tests
 ```
 
 ## Commands
 
 ```bash
-# Initialize environment
+# Initialize environment (runs uv sync internally)
 ./init.sh
 
+# Manage Python deps with uv
+uv sync # sync env to lock file
+uv add <pkg> # add runtime dependency
+uv add --dev <pkg> # add dev dependency
+uv lock --upgrade # upgrade lock file
+
 # Run the application (starts scheduler + FastAPI on port 8080)
-python main.py
+uv run python main.py
 
 # Run backend tests
-python -m pytest tests/
+uv run pytest tests/
 # or
-python -m unittest discover tests/
+uv run python -m unittest discover tests/
 
 # Run frontend dev server
-cd frontend && npm run dev          # http://localhost:5173
+cd frontend && npm run dev # http://localhost:5173
 
 # Build frontend
-cd frontend && npm run build        # output to frontend/dist
+cd frontend && npm run build # output to frontend/dist
 
 # Check syntax
-python -m py_compile main.py config.py api/*.py core/*.py notify/*.py storage/*.py web/*.py web/routers/*.py
-
-# Check frontend build
-cd frontend && npm run build
+uv run python -m py_compile main.py config.py api/*.py core/*.py notify/*.py storage/*.py web/*.py web/routers/*.py
 
 # Check frontend TypeScript
 cd frontend && npx vue-tsc --noEmit
@@ -252,8 +256,8 @@ cd frontend && npx vue-tsc --noEmit
 cd frontend && npm run lint
 
 # Code linting
-ruff check .
-mypy main.py config.py api/ core/ notify/ storage/ web/
+uv run ruff check .
+uv run mypy main.py config.py api/ core/ notify/ storage/ web/
 ```
 
 ## Coding Conventions
@@ -280,17 +284,17 @@ mypy main.py config.py api/ core/ notify/ storage/ web/
 
 **v2.1 前端优化专项规范：**
 - **Design Tokens 优先**：所有颜色、间距、圆角、阴影必须来自 `styles/tokens.ts`，禁止硬编码任何色值（如 `#fff`、`#333`）
-- **主题一致性**：所有样式必须同时支持 light/dark 模式，使用 `useTheme()` composable 获取当前主题
+- **主题一致性**：所有样式必须同时支持 light/dark 模式，使用 `useTheme` composable 获取当前主题
 - **涨跌颜色配置化**：价格变化颜色不直接写死红/绿，必须通过 `tokens.ts` 中的 `colorUp`/`colorDown`，支持中国/国际习惯切换
 - **数字等宽显示**：所有价格、百分比使用 `font-family: 'JetBrains Mono', monospace`，确保数字跳动不抖
 - **组件分层**：
-  - `components/base/`：纯展示组件，无业务逻辑（PriceText, TrendBadge, Sparkline, StatCard, EmptyState, Skeleton*）
-  - `components/layout/`：布局组件（Sidebar, TopBar, AppLayout, PageHeader）
-  - `components/business/`：业务组件（AlertCard, WatchlistRow, ExtremeTrackCard）
+ - `components/base/`：纯展示组件，无业务逻辑（PriceText, TrendBadge, Sparkline, StatCard, EmptyState, Skeleton*）
+ - `components/layout/`：布局组件（Sidebar, TopBar, AppLayout, PageHeader）
+ - `components/business/`：业务组件（AlertCard, WatchlistRow, ExtremeTrackCard）
 - **骨架屏规范**：所有列表/表格/图表在首次加载时显示对应骨架屏，数据到达后淡入切换（200ms）
 - **动效克制**：页面切换 240ms 淡入 + 上移 4px；数字变化 100ms 高亮闪烁；不使用无意义的大面积动画
 - **无障碍**：所有图标按钮必须有 `aria-label`；表单必须有 `label-for`；焦点环必须可见（`outline: 2px solid brand-primary`）
-- **国际化**：所有用户可见字符串使用 `vue-i18n` `$t()`，中英双语骨架优先覆盖菜单、按钮、表单标签
+- **国际化**：所有用户可见字符串使用 `vue-i18n` `$t`，中英双语骨架优先覆盖菜单、按钮、表单标签
 - **ECharts 按需引入**：禁止 `import * as echarts from 'echarts'`，必须使用 `echarts/core` + `echarts/charts` + `echarts/components` 按需组合
 
 ## Key Rules

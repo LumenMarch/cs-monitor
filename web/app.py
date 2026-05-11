@@ -14,7 +14,18 @@ from loguru import logger
 from api.steamdt import SteamDTClient, SteamDTConfig
 from config import MonitorConfig
 from storage.database import Database
-from web.routers import alerts, archive, auth, dashboard, extreme_track, kline, prices, settings, watchlist
+from web.routers import (
+    alerts,
+    archive,
+    auth,
+    dashboard,
+    extreme_track,
+    kline,
+    prices,
+    settings,
+    users,
+    watchlist,
+)
 from web.schemas import HealthResponse
 
 
@@ -58,6 +69,7 @@ def create_app(db: Database, config: MonitorConfig) -> FastAPI:
 
     # 注册路由
     app.include_router(auth.router, prefix="/api")
+    app.include_router(users.router, prefix="/api")
     app.include_router(dashboard.router, prefix="/api")
     app.include_router(watchlist.router, prefix="/api")
     app.include_router(alerts.router, prefix="/api")
@@ -73,8 +85,8 @@ def create_app(db: Database, config: MonitorConfig) -> FastAPI:
     def health_check() -> dict[str, str]:
         """健康检查端点（无需认证，供 Docker / 运维监控使用）."""
         try:
-            # 简单验证数据库可连接
-            db.get_watchlist_count()
+            # 简单 PING：用 schema_version 验证 DB 可连接（与具体业务表无关）
+            db.get_system_config("schema_version")
             db_status = "ok"
         except Exception:
             db_status = "error"
