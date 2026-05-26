@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchDashboardSummary } from '@/api/endpoints'
+import { fetchDashboardSummary, fetchWatchlist } from '@/api/endpoints'
+import { backendToWatchItem } from '@/api/adapters'
 import { HeroBlock } from '@/components/dashboard/HeroBlock'
 import { KpiStrip } from '@/components/dashboard/KpiStrip'
 import { MoversSplit } from '@/components/dashboard/MoversTable'
@@ -12,12 +13,11 @@ import { LoadingDashboard } from '@/components/dashboard/LoadingDashboard'
 import { Card } from '@/components/ui/Card'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { useTweaks } from '@/stores/tweaks'
-import { HERO_METRICS, WATCHLIST } from '@/data/mock'
 import { splitItemName } from '@/utils/format'
 
 /**
- * Dashboard · CS Monitor Editorial Trading Terminal · v3.1
- * 实现 design.md §0–§7 全部 dashboard 区块
+ * Dashboard · CS Monitor Editorial Trading Terminal
+ * 所有区块均接 /api 后端,Tweaks 仍可强制切到 Empty/Loading 演示态
  */
 export default function Dashboard() {
   const appState = useTweaks((s) => s.appState)
@@ -30,25 +30,47 @@ export default function Dashboard() {
 function DashboardContent() {
   const today = useMemo(() => {
     const d = new Date()
-    const date = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-    const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+    const date = d.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    })
+    const time = d.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
     return `${date} · ${time}`
   }, [])
 
-  // 真后端 summary;Movers / Heatmap / AlertFeed 暂用 mock 占位(下轮接通)
-  const { data: summary } = useQuery({
+  const summaryQ = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: fetchDashboardSummary,
     staleTime: 60_000,
   })
+  const summary = summaryQ.data
 
-  // 涨/跌头部 - 标题文案数据(mock,演示用)
-  const gainers = [...WATCHLIST].sort((a, b) => b.change24 - a.change24)
-  const losers = [...WATCHLIST].sort((a, b) => a.change24 - b.change24)
-  const leadGain = splitItemName(gainers[0]!.name).finish
-  const leadLoss = splitItemName(losers[0]!.name).finish
+  const watchlistQ = useQuery({
+    queryKey: ['watchlist'],
+    queryFn: fetchWatchlist,
+    staleTime: 60_000,
+  })
 
-  // KPI:有真数据用真数据
+  // 用真 watchlist 算 leader / dragger + 今日涨跌平衡
+  const { leadGain, leadLoss, upCount, downCount } = useMemo(() => {
+    const items = (watchlistQ.data ?? []).map(backendToWatchItem)
+    const sortedByChange = [...items].sort((a, b) => b.change24 - a.change24)
+    const gain = sortedByChange[0]
+    const loss = sortedByChange[sortedByChange.length - 1]
+    return {
+      leadGain: gain ? splitItemName(gain.name).finish || gain.name : null,
+      leadLoss: loss ? splitItemName(loss.name).finish || loss.name : null,
+      upCount: items.filter((i) => i.change24 > 0).length,
+      downCount: items.filter((i) => i.change24 < 0).length,
+    }
+  }, [watchlistQ.data])
+
+  // KPI:真后端数据
   const todayAlerts = summary?.today_alert_count ?? 0
   const yesterdayAlerts = summary?.yesterday_alert_count ?? 0
   const alertDelta = todayAlerts - yesterdayAlerts
@@ -63,16 +85,37 @@ function DashboardContent() {
       <div className="flex items-end justify-between gap-[18px] mb-[22px]">
         <div>
           <div className="font-mono text-[10.5px] tracking-[0.22em] uppercase text-[var(--muted)] mb-2">
-            {today} · {gainers.filter((g) => g.change24 > 0).length} ↑ {losers.filter((l) => l.change24 < 0).length} ↓ today
+            {today} · {upCount} ↑ {downCount} ↓ today
           </div>
           <h1 className="font-serif font-normal text-[44px] leading-[1.05] tracking-[-0.015em] m-0">
-            <em className="not-italic">
-              <span className="italic text-[var(--accent)]">+{HERO_METRICS.changePct.toFixed(1)}%</span>
-            </em>{' '}
-            this month —
-            <br />
-            led by <em className="italic text-[var(--accent)]">{leadGain}</em>, dragged by{' '}
-            <em className="italic text-[var(--accent)]">{leadLoss}</em>.
+            {leadGain || leadLoss ? (
+              <>
+                Watching{' '}
+                <em className="not-italic">
+                  <span className="italic text-[var(--accent)]">{activeWatch}</span>
+                </em>{' '}
+                items —
+                <br />
+                {leadGain && (
+                  <>
+                    led by <em className="italic text-[var(--accent)]">{leadGain}</em>
+                  </>
+                )}
+                {leadGain && leadLoss && ', '}
+                {leadLoss && (
+                  <>
+                    dragged by <em className="italic text-[var(--accent)]">{leadLoss}</em>
+                  </>
+                )}
+                .
+              </>
+            ) : (
+              <>
+                No <em className="italic text-[var(--accent)]">watchlist</em> yet —
+                <br />
+                add items to start tracking.
+              </>
+            )}
           </h1>
         </div>
       </div>
@@ -119,7 +162,10 @@ function DashboardContent() {
       <div className="h-9" />
 
       {/* —— Movers + Alerts —— */}
-      <section className="grid gap-7" style={{ gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)' }}>
+      <section
+        className="grid gap-7"
+        style={{ gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)' }}
+      >
         <div>
           <SectionHead
             num="01"
@@ -127,7 +173,7 @@ function DashboardContent() {
               <>
                 Today's movers{' '}
                 <span className="font-mono text-[10px] tracking-[0.2em] text-[var(--muted)] ml-2">
-                  5 ↑ / 5 ↓
+                  {upCount} ↑ / {downCount} ↓
                 </span>
               </>
             }
@@ -145,7 +191,7 @@ function DashboardContent() {
               <>
                 Alert feed{' '}
                 <span className="font-mono text-[10px] tracking-[0.2em] text-[var(--muted)] ml-2">
-                  14 today
+                  {todayAlerts} today
                 </span>
               </>
             }
@@ -160,7 +206,10 @@ function DashboardContent() {
       <div className="h-9" />
 
       {/* —— Heatmap + Collections —— */}
-      <section className="grid gap-7" style={{ gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)' }}>
+      <section
+        className="grid gap-7"
+        style={{ gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)' }}
+      >
         <div>
           <SectionHead
             num="03"
@@ -172,7 +221,7 @@ function DashboardContent() {
                 </span>
               </>
             }
-            meta="Local time · UTC+8"
+            meta="Hourly K-line"
           />
           <Card>
             <VolatilityHeatmap />
@@ -189,7 +238,15 @@ function DashboardContent() {
                 </span>
               </>
             }
-            meta="Next · 14:00"
+            meta={
+              summary?.last_update
+                ? new Date(summary.last_update).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  })
+                : '—'
+            }
           />
           <Card>
             <CollectionsFeed />
