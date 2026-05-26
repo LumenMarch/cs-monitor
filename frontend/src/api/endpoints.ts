@@ -9,6 +9,7 @@ import type {
   MeResponse,
   PlatformPriceItem,
   SearchItem,
+  SystemInfo,
   WatchlistItemCreate,
   WatchlistItemUpdate,
   WatchlistItemWithPrice,
@@ -23,6 +24,21 @@ export async function login(req: LoginRequest): Promise<LoginResponse> {
 
 export async function fetchMe(): Promise<MeResponse> {
   const { data } = await client.get<MeResponse>('/auth/me')
+  return data
+}
+
+export async function updateSteamdtKey(apiKey: string): Promise<void> {
+  await client.put('/auth/steamdt-key', { api_key: apiKey })
+}
+
+export async function deleteSteamdtKey(): Promise<void> {
+  await client.delete('/auth/steamdt-key')
+}
+
+/* —— System info —— */
+
+export async function fetchSystemInfo(): Promise<SystemInfo> {
+  const { data } = await client.get<SystemInfo>('/settings/system')
   return data
 }
 

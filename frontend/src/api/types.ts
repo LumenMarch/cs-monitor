@@ -137,3 +137,13 @@ export interface SearchItem {
   name?: string
   icon_url?: string
 }
+
+export interface SystemInfo {
+  version: string
+  db_path: string
+  db_size: number
+  db_size_human: string
+  data_dir: string
+  watchlist_count: number
+  extreme_track_count: number
+}

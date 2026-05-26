@@ -1,6 +1,15 @@
 import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { CheckCircle2, RefreshCcw, Trash2, XCircle } from 'lucide-react'
+import { apiErrorMessage } from '@/api/client'
+import {
+  deleteSteamdtKey,
+  fetchMe,
+  fetchSystemInfo,
+  updateSteamdtKey,
+} from '@/api/endpoints'
+import { useAuth } from '@/stores/auth'
 import { Button } from '@/components/ui/Button'
-import { StatusDot } from '@/components/ui/StatusDot'
 import { Toggle } from '@/components/ui/Toggle'
 import { SettingRow } from './SettingRow'
 import { SegmentedControl } from './SegmentedControl'
@@ -27,9 +36,47 @@ const INITIAL_PLATFORMS: PlatformSource[] = [
 type RateLimit = '30' | '60' | '120' | '200'
 type Cache = '0' | '30' | '60' | '300'
 
-/** SteamDT API tab · 设计最丰富的一页 */
+/** SteamDT API tab · 接 /auth/steamdt-key + /settings/system */
 export function SteamDtTab() {
+  const queryClient = useQueryClient()
+  const me = useAuth((s) => s.user)
+  const setMe = useAuth((s) => s.setUser)
+
+  const [tokenInput, setTokenInput] = useState('')
   const [tokenVisible, setTokenVisible] = useState(false)
+
+  const sysQuery = useQuery({
+    queryKey: ['system-info'],
+    queryFn: fetchSystemInfo,
+    staleTime: 60_000,
+  })
+
+  // 真后端动作
+  const updateKey = useMutation({
+    mutationFn: (apiKey: string) => updateSteamdtKey(apiKey),
+    onSuccess: async () => {
+      const fresh = await fetchMe()
+      setMe(fresh)
+      setTokenInput('')
+      queryClient.invalidateQueries({ queryKey: ['me'] })
+    },
+  })
+
+  const deleteKey = useMutation({
+    mutationFn: deleteSteamdtKey,
+    onSuccess: async () => {
+      const fresh = await fetchMe()
+      setMe(fresh)
+      queryClient.invalidateQueries({ queryKey: ['me'] })
+    },
+  })
+
+  const testConn = useMutation({
+    mutationFn: fetchMe,
+    onSuccess: (fresh) => setMe(fresh),
+  })
+
+  // —— 仅本地状态(未持久化的 UI 偏好) ——
   const [platforms, setPlatforms] = useState(INITIAL_PLATFORMS)
   const [rateLimit, setRateLimit] = useState<RateLimit>('120')
   const [autoBackoff, setAutoBackoff] = useState(true)
@@ -39,21 +86,24 @@ export function SteamDtTab() {
     setPlatforms((prev) => prev.map((p, idx) => (idx === i ? { ...p, on: !p.on } : p)))
   }
 
+  const hasKey = !!me?.has_steamdt_key
+  const connOk = testConn.isSuccess || hasKey
+
   return (
     <div>
       <SettingRow
         title="API endpoint"
         description={
           <>
-            SteamDT open API base URL. Defaults to{' '}
-            <code className="font-mono text-[11.5px]">open.steamdt.com/api</code>. Override for proxy or
-            self-hosted relay.
+            SteamDT open API base URL. 默认 <code className="font-mono text-[11.5px]">open.steamdt.com/api</code>,
+            由后端 <code className="font-mono text-[11.5px]">.env</code> 配置;前端只读展示。
           </>
         }
         control={
           <Input
             mono
-            defaultValue="https://open.steamdt.com/api"
+            readOnly
+            value="https://open.steamdt.com/api"
             style={{ width: 280 }}
           />
         }
@@ -63,28 +113,63 @@ export function SteamDtTab() {
         title="API token"
         description={
           <>
-            Optional. Without a token you're limited to public quotes (~10k/day). Personal tokens unlock
-            50k/day and the <em>inventory</em> endpoint.
+            可选。无 token 时回退到系统级 .env 配置。Personal token 解锁 50k/天与{' '}
+            <em>inventory</em> 接口,密文 + master 密钥加密入 DB。
           </>
         }
         control={
-          <div className="flex items-center gap-2.5">
-            <Input
-              mono
-              type={tokenVisible ? 'text' : 'password'}
-              defaultValue="••••••••••••••••a3f2"
-              style={{ width: 220, letterSpacing: '0.06em' }}
-            />
-            <Button
-              variant="ghost"
-              onClick={() => setTokenVisible((v) => !v)}
-              className="text-[11px] tracking-[0.08em] px-2 py-1.5"
-            >
-              {tokenVisible ? 'HIDE' : 'SHOW'}
-            </Button>
-            <Button variant="ghost" className="text-[11px] tracking-[0.08em] px-2 py-1.5">
-              ROTATE
-            </Button>
+          <div className="flex flex-col gap-1.5 items-end">
+            <div className="flex items-center gap-2">
+              <Input
+                mono
+                type={tokenVisible ? 'text' : 'password'}
+                placeholder={hasKey ? '••••••••••••(已加密保存)' : 'Paste your SteamDT token'}
+                value={tokenInput}
+                onChange={(e) => setTokenInput(e.target.value)}
+                style={{ width: 240, letterSpacing: '0.06em' }}
+              />
+              <Button
+                variant="ghost"
+                onClick={() => setTokenVisible((v) => !v)}
+                className="text-[11px] tracking-[0.08em] px-2 py-1.5"
+              >
+                {tokenVisible ? 'HIDE' : 'SHOW'}
+              </Button>
+            </div>
+            <div className="flex gap-2 items-center">
+              <Button
+                onClick={() => tokenInput.trim() && updateKey.mutate(tokenInput.trim())}
+                disabled={!tokenInput.trim() || updateKey.isPending}
+                className="text-[12px] px-3 py-1.5"
+              >
+                {updateKey.isPending ? 'Saving…' : hasKey ? 'Rotate key' : 'Save key'}
+              </Button>
+              {hasKey && (
+                <Button
+                  variant="ghost"
+                  onClick={() => deleteKey.mutate()}
+                  disabled={deleteKey.isPending}
+                  className="!text-[var(--down)] text-[12px] px-3 py-1.5"
+                >
+                  <Trash2 size={12} /> Remove
+                </Button>
+              )}
+            </div>
+            {(updateKey.error || deleteKey.error) && (
+              <div className="font-mono text-[10.5px] text-[var(--down)] mt-0.5">
+                {apiErrorMessage(updateKey.error ?? deleteKey.error)}
+              </div>
+            )}
+            {updateKey.isSuccess && (
+              <div className="font-mono text-[10.5px] text-[var(--up)] mt-0.5">
+                ✓ 已加密保存,后续 SteamDT 请求会优先用你的 key
+              </div>
+            )}
+            {deleteKey.isSuccess && (
+              <div className="font-mono text-[10.5px] text-[var(--muted)] mt-0.5">
+                — Key 已清除,回退到系统级 fallback
+              </div>
+            )}
           </div>
         }
       />
@@ -92,48 +177,72 @@ export function SteamDtTab() {
       <SettingRow
         title="Connection status"
         description={
-          <>
-            Last successful call · 11s ago · token verified · plan tier{' '}
-            <strong className="text-[var(--accent)] font-medium">personal</strong>
-          </>
+          hasKey ? (
+            <>
+              Personal key registered · <strong className="text-[var(--accent)] font-medium">user-scoped</strong>{' '}
+              · master encrypted at rest
+            </>
+          ) : (
+            <>System fallback · 当无个人 key 时使用 .env 配置(若有)</>
+          )
         }
         control={
           <div className="flex flex-col gap-1 items-end">
-            <span className="font-mono text-[12px] text-[var(--up)] flex items-center gap-1.5">
-              <StatusDot /> 184 ms · OK
-            </span>
-            <Button className="text-[12px] px-2.5 py-1.5">Test connection ↻</Button>
+            {testConn.isPending ? (
+              <span className="font-mono text-[12px] text-[var(--muted)] flex items-center gap-1.5">
+                <RefreshCcw size={11} className="animate-spin" /> Testing…
+              </span>
+            ) : connOk ? (
+              <span className="font-mono text-[12px] text-[var(--up)] flex items-center gap-1.5">
+                <CheckCircle2 size={11} /> {testConn.isSuccess ? 'token verified' : 'configured'}
+              </span>
+            ) : (
+              <span className="font-mono text-[12px] text-[var(--muted)] flex items-center gap-1.5">
+                <XCircle size={11} /> not set
+              </span>
+            )}
+            <Button onClick={() => testConn.mutate()} className="text-[12px] px-2.5 py-1.5">
+              <RefreshCcw size={11} /> Test connection
+            </Button>
           </div>
         }
       />
 
       <SettingRow
-        title="Daily quota"
-        description="Resets at 00:00 UTC. Calls are batched; one fetch covers up to 50 items."
+        title="Account stats"
+        description="当前用户在 SteamDT 上的轮询占用 + 数据库大小。SteamDT 不提供配额查询接口,这里展示本地索引和你的监控规模。"
         align="stretch"
         control={
           <div className="flex flex-col gap-1.5 min-w-[280px]">
-            <div className="font-mono tnum text-[13px] flex justify-between items-baseline">
-              <span className="text-[var(--muted)]">USED</span>
-              <span>
-                <strong className="text-[16px] text-[var(--ink)] font-medium">4,213</strong>{' '}
-                <span className="text-[var(--muted-2)]">/ 50,000 · 8.4%</span>
-              </span>
-            </div>
-            <div className="h-1 bg-[var(--hairline)] rounded-full overflow-hidden">
-              <div className="h-full bg-[var(--accent)]" style={{ width: '8.4%' }} />
-            </div>
-            <div className="font-mono text-[10.5px] text-[var(--muted)] tracking-[0.08em] flex justify-between">
-              <span>resets in 9h 28m</span>
-              <span>~ 17.6k projected today</span>
-            </div>
+            {sysQuery.isLoading && (
+              <span className="font-mono text-[11px] text-[var(--muted)]">Loading…</span>
+            )}
+            {sysQuery.data && (
+              <>
+                <KvLine label="Watchlist" value={`${sysQuery.data.watchlist_count} items`} />
+                <KvLine label="Extreme trackers" value={`${sysQuery.data.extreme_track_count} configs`} />
+                <KvLine label="DB size" value={sysQuery.data.db_size_human} />
+                <KvLine label="Server version" value={`v${sysQuery.data.version}`} />
+                <KvLine
+                  label="Data dir"
+                  value={
+                    <code className="font-mono text-[10.5px]">{sysQuery.data.data_dir}</code>
+                  }
+                />
+              </>
+            )}
+            {sysQuery.isError && (
+              <div className="font-mono text-[11px] text-[var(--down)]">
+                {apiErrorMessage(sysQuery.error)}
+              </div>
+            )}
           </div>
         }
       />
 
       <SettingRow
         title="Platform sources"
-        description="Pick which markets to include in the price merge. Each source counts as one call per fetch — disabling unused platforms saves quota."
+        description="前端展示用,实际平台选择由后端 .env 配置。Disabling 在 UI 上预览效果,不向服务端提交。"
         align="stretch"
         control={
           <div className="flex flex-col min-w-[320px]">
@@ -181,7 +290,7 @@ export function SteamDtTab() {
 
       <SettingRow
         title="Rate limit"
-        description="Max requests per minute, shared across platforms. SteamDT throttles past 60 rpm on the public plan and 200 rpm on personal."
+        description="Max requests per minute, shared across platforms. SteamDT throttles past 60 rpm on the public plan and 200 rpm on personal. 仅前端预览。"
         control={
           <SegmentedControl
             value={rateLimit}
@@ -198,13 +307,13 @@ export function SteamDtTab() {
 
       <SettingRow
         title="Auto-backoff on 429"
-        description="Pause all polling for an exponential interval (2s, 4s, 8s…) when the API returns Too Many Requests. Recommended."
+        description="Pause all polling for an exponential interval (2s, 4s, 8s…) when the API returns Too Many Requests. 后端默认开启。"
         control={<Toggle checked={autoBackoff} onChange={setAutoBackoff} ariaLabel="Auto-backoff" />}
       />
 
       <SettingRow
         title="Response cache"
-        description="Cache identical merged-price responses for this many seconds before re-fetching. Watchlist refresh respects cadence regardless."
+        description="Cache identical merged-price responses for this many seconds before re-fetching. 仅前端预览。"
         control={
           <SegmentedControl
             value={cache}
@@ -220,6 +329,15 @@ export function SteamDtTab() {
       />
 
       <DiagnosticLog />
+    </div>
+  )
+}
+
+function KvLine({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between items-baseline font-mono text-[12px]">
+      <span className="text-[var(--muted)] tracking-[0.1em] uppercase text-[10px]">{label}</span>
+      <span className="text-[var(--ink)] tnum">{value}</span>
     </div>
   )
 }
