@@ -9,7 +9,7 @@ import ItemDetail from '@/pages/ItemDetail'
 import Alerts from '@/pages/Alerts'
 import ExtremeTrack from '@/pages/ExtremeTrack'
 import Settings from '@/pages/Settings'
-import ComingSoon from '@/pages/ComingSoon'
+import Analytics from '@/pages/Analytics'
 
 /**
  * App · 路由 + Tweaks 同步到 <html data-*>
@@ -37,15 +37,7 @@ export default function App() {
           <Route path="/item/:id" element={<ItemDetail />} />
           <Route path="/extreme" element={<ExtremeTrack />} />
           <Route path="/alerts" element={<Alerts />} />
-          <Route
-            path="/analytics"
-            element={
-              <ComingSoon
-                title="Analytics"
-                description="31 日波动日历、跨平台价差、流动性排名 — 下一轮实现。"
-              />
-            }
-          />
+          <Route path="/analytics" element={<Analytics />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
