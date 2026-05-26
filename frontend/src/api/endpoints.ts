@@ -2,6 +2,7 @@ import client from './client'
 import type {
   AlertRecord,
   AlertStatsResponse,
+  ChangePasswordRequest,
   DashboardSummary,
   ExtremeAlertListResponse,
   ExtremeTrackConfig,
@@ -31,6 +32,10 @@ export async function login(req: LoginRequest): Promise<LoginResponse> {
 export async function fetchMe(): Promise<MeResponse> {
   const { data } = await client.get<MeResponse>('/auth/me')
   return data
+}
+
+export async function changePassword(payload: ChangePasswordRequest): Promise<void> {
+  await client.post('/auth/change-password', payload)
 }
 
 export async function updateSteamdtKey(apiKey: string): Promise<void> {

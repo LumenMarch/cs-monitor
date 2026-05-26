@@ -231,3 +231,10 @@ export interface NotifyTestRequest {
   channel?: string
   extra?: Record<string, string>
 }
+
+/* —— Change password —— */
+
+export interface ChangePasswordRequest {
+  current_password: string
+  new_password: string
+}

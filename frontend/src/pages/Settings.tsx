@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { AppearanceTab } from '@/components/settings/AppearanceTab'
 import { SteamDtTab } from '@/components/settings/SteamDtTab'
+import { SecurityTab } from '@/components/settings/SecurityTab'
 import { NotificationsTab } from '@/components/settings/NotificationsTab'
 import { MonitorTab } from '@/components/settings/MonitorTab'
 import { DataTab } from '@/components/settings/DataTab'
 import { AboutTab } from '@/components/settings/AboutTab'
 import { cn } from '@/utils/cn'
 
-type TabId = 'appearance' | 'api' | 'notify' | 'monitor' | 'data' | 'about'
+type TabId = 'appearance' | 'api' | 'security' | 'notify' | 'monitor' | 'data' | 'about'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'api', label: 'SteamDT API' },
+  { id: 'security', label: 'Security' },
   { id: 'notify', label: 'Notifications' },
   { id: 'monitor', label: 'Monitor' },
   { id: 'data', label: 'Data' },
@@ -62,6 +64,7 @@ export default function Settings() {
         <div>
           {tab === 'appearance' && <AppearanceTab />}
           {tab === 'api' && <SteamDtTab />}
+          {tab === 'security' && <SecurityTab />}
           {tab === 'notify' && <NotificationsTab />}
           {tab === 'monitor' && <MonitorTab />}
           {tab === 'data' && <DataTab />}

@@ -5,8 +5,10 @@ import { fetchMe } from '@/api/endpoints'
 import { useAuth } from '@/stores/auth'
 
 /**
- * 路由守卫:无 token → 跳 /login
- * 有 token 时拉一次 /auth/me 同步用户信息(随路由变化失效则自动登出)
+ * 路由守卫
+ * - 无 token → /login
+ * - 有 token 但 fetchMe 401/失败 → 自动 logout(回到 /login)
+ * - me.must_change_password === true → 强制 /change-password(只允许在该路由停留)
  */
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token, setUser, logout } = useAuth()
@@ -41,6 +43,14 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
         </div>
       </div>
     )
+  }
+
+  // 必须改密 → 强制跳改密页(若已在该页则放行,避免死循环)
+  if (
+    meQuery.data?.must_change_password &&
+    location.pathname !== '/change-password'
+  ) {
+    return <Navigate to="/change-password" replace />
   }
 
   return <>{children}</>

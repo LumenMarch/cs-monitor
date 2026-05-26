@@ -12,6 +12,7 @@ import ExtremeTrack from '@/pages/ExtremeTrack'
 import Settings from '@/pages/Settings'
 import Analytics from '@/pages/Analytics'
 import Login from '@/pages/Login'
+import ChangePassword from '@/pages/ChangePassword'
 
 /**
  * App · 路由 + Tweaks 同步到 <html data-*>
@@ -33,6 +34,16 @@ export default function App() {
     <Routes>
       {/* 登录页:无 layout / 无 tweaks panel */}
       <Route path="/login" element={<Login />} />
+
+      {/* 改密页:有 RequireAuth 但无 AppLayout(自带全屏 layout) */}
+      <Route
+        path="/change-password"
+        element={
+          <RequireAuth>
+            <ChangePassword />
+          </RequireAuth>
+        }
+      />
 
       {/* 其余路由统一走 RequireAuth + AppLayout */}
       <Route
