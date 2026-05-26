@@ -3,6 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import Dashboard from '@/pages/Dashboard'
 import Watchlist from '@/pages/Watchlist'
 import ItemDetail from '@/pages/ItemDetail'
+import Alerts from '@/pages/Alerts'
 import ComingSoon from '@/pages/ComingSoon'
 
 /**
@@ -26,15 +27,7 @@ export default function App() {
             />
           }
         />
-        <Route
-          path="/alerts"
-          element={
-            <ComingSoon
-              title="Alerts"
-              description="14 日堆叠柱状图、±1h 价格曲线、Top alerting items 排行 — 下一轮实现。"
-            />
-          }
-        />
+        <Route path="/alerts" element={<Alerts />} />
         <Route
           path="/analytics"
           element={
