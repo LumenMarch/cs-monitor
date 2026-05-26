@@ -1,7 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Columns3, MoreVertical, Plus } from 'lucide-react'
-import { WATCHLIST, type WatchItem } from '@/data/mock'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Columns3, MoreVertical, Plus, RefreshCcw } from 'lucide-react'
+import { apiErrorMessage } from '@/api/client'
+import {
+  fetchWatchlist,
+  refreshWatchlist,
+  updateWatchlistItem,
+} from '@/api/endpoints'
+import { backendToWatchItem } from '@/api/adapters'
+import { type WatchItem } from '@/data/mock'
 import { formatCurrency, formatDelta } from '@/utils/format'
 import { cn } from '@/utils/cn'
 import { Button } from '@/components/ui/Button'
@@ -29,6 +37,7 @@ type SortKey = 'name' | 'price' | 'change24' | 'change7d' | 'threshold'
  */
 export default function Watchlist() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [view, setView] = useState<View>('table')
   const [selected, setSelected] = useState<Set<number>>(new Set())
@@ -37,22 +46,34 @@ export default function Watchlist() {
   const [cols, setCols] = useState<ColumnMap>({
     price: true,
     change24: true,
-    change7d: true,
+    change7d: false, // 后端暂无 7d 数据,默认隐藏
     spark: true,
     threshold: true,
     listings: false,
     monitor: true,
   })
-  // 受控的 monitoring 状态(避免改原始数据)
-  const [monitorOverrides, setMonitorOverrides] = useState<Record<number, boolean>>({})
+
+  // —— 真后端数据 ——
+  const query = useQuery({
+    queryKey: ['watchlist'],
+    queryFn: fetchWatchlist,
+    staleTime: 30_000,
+  })
+
+  const refreshMut = useMutation({
+    mutationFn: refreshWatchlist,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['watchlist'] }),
+  })
+
+  const toggleMut = useMutation({
+    mutationFn: ({ marketHashName, enabled }: { marketHashName: string; enabled: boolean }) =>
+      updateWatchlistItem(marketHashName, { enabled }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['watchlist'] }),
+  })
 
   const items: WatchItem[] = useMemo(
-    () =>
-      WATCHLIST.map((w) => ({
-        ...w,
-        monitoring: monitorOverrides[w.id] ?? w.monitoring,
-      })),
-    [monitorOverrides],
+    () => (query.data ?? []).map(backendToWatchItem),
+    [query.data],
   )
 
   const baseFiltered = useMemo(() => {
@@ -103,7 +124,13 @@ export default function Watchlist() {
   }
 
   function toggleMonitor(id: number, next: boolean) {
-    setMonitorOverrides((prev) => ({ ...prev, [id]: next }))
+    const item = items.find((w) => w.id === id)
+    if (!item) return
+    // 后端按 market_hash_name + wear 后缀作为完整 key,但 normalize 时把 wear 去掉了。
+    // 这里通过原始 backend data 找回完整 market_hash_name。
+    const backend = query.data?.find((b) => b.id === id)
+    if (!backend) return
+    toggleMut.mutate({ marketHashName: backend.market_hash_name, enabled: next })
   }
 
   // chip 配置
@@ -178,13 +205,26 @@ export default function Watchlist() {
               <ColumnsPopover cols={cols} setCols={setCols} onClose={() => setColsOpen(false)} />
             )}
           </div>
-          <Button>Import</Button>
+          <Button
+            onClick={() => refreshMut.mutate()}
+            disabled={refreshMut.isPending}
+          >
+            <RefreshCcw size={13} className={refreshMut.isPending ? 'animate-spin' : ''} />
+            {refreshMut.isPending ? 'Refreshing…' : 'Refresh'}
+          </Button>
           <Button variant="primary">
             <Plus size={13} />
             Add item
           </Button>
         </div>
       </div>
+
+      {/* —— 错误条 —— */}
+      {query.isError && (
+        <div className="mb-4 font-mono text-[11.5px] text-[var(--down)] bg-[var(--down-bg)] border border-[var(--down)]/20 rounded-[3px] px-3 py-2">
+          加载失败:{apiErrorMessage(query.error)}
+        </div>
+      )}
 
       {/* —— Filter chips —— */}
       <FilterChips chips={chips} value={filter} onChange={setFilter} />
@@ -194,8 +234,29 @@ export default function Watchlist() {
         <BulkActionBar items={selectedItems} onClear={() => setSelected(new Set())} />
       )}
 
+      {/* —— Loading / Empty —— */}
+      {query.isLoading && (
+        <div className="py-[60px] text-center font-mono text-[12px] tracking-[0.1em] uppercase text-[var(--muted)]">
+          Loading watchlist…
+        </div>
+      )}
+      {!query.isLoading && items.length === 0 && (
+        <div className="mt-7 border border-dashed border-[var(--hairline-2)] rounded-[4px] bg-[var(--surface)] py-[60px] px-6 text-center">
+          <div className="font-mono text-[10px] tracking-[0.2em] uppercase text-[var(--accent)] bg-[var(--accent-soft)] inline-block px-2 py-1 rounded-[2px]">
+            Empty watchlist
+          </div>
+          <h3 className="font-serif text-[28px] m-0 mt-3">
+            No items in your watchlist yet.
+          </h3>
+          <p className="text-[var(--muted)] text-[13px] m-0 mt-2 max-w-[44ch] mx-auto">
+            点击右上角 <strong className="text-[var(--ink)] font-medium">＋ Add item</strong>{' '}
+            添加监控,或先在设置里配置 SteamDT API Key。
+          </p>
+        </div>
+      )}
+
       {/* —— Table or Cards —— */}
-      {view === 'table' ? (
+      {!query.isLoading && items.length > 0 && (view === 'table' ? (
         <div className="mt-0 overflow-x-auto">
           <table className="w-full border-collapse text-[13px]">
             <thead>
@@ -389,7 +450,7 @@ export default function Watchlist() {
             <WatchCard key={w.id} item={w} />
           ))}
         </div>
-      )}
+      ))}
     </div>
   )
 }

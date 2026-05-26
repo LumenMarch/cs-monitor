@@ -1,9 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { ChevronDown, ExternalLink, Settings as SettingsIcon, User } from 'lucide-react'
-import { CURRENT_USER } from '@/data/mock'
+import { ChevronDown, ExternalLink, LogOut, Settings as SettingsIcon, User } from 'lucide-react'
+import { useAuth } from '@/stores/auth'
 import { StatusDot } from '@/components/ui/StatusDot'
 import { cn } from '@/utils/cn'
+
+/** 取用户名首两位字母(大写),fallback "??" */
+function initials(name?: string): string {
+  if (!name) return '??'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length >= 2) return (parts[0]![0]! + parts[1]![0]!).toUpperCase()
+  return name.slice(0, 2).toUpperCase()
+}
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', num: '01' },
@@ -29,6 +37,9 @@ export function Sidebar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+  const { user, logout } = useAuth()
+  const userInitials = useMemo(() => initials(user?.username), [user?.username])
+  const roleLabel = user?.role ?? '—'
 
   useEffect(() => {
     if (!menuOpen) return
@@ -140,18 +151,17 @@ export function Sidebar() {
           onClick={() => setMenuOpen((o) => !o)}
         >
           <span
-            className="w-[26px] h-[26px] rounded-full inline-flex items-center justify-center text-white text-[11px] font-semibold leading-none flex-shrink-0"
-            style={{ background: CURRENT_USER.color }}
+            className="w-[26px] h-[26px] rounded-full inline-flex items-center justify-center text-white text-[11px] font-semibold leading-none flex-shrink-0 bg-[var(--accent)]"
           >
-            {CURRENT_USER.initials}
+            {userInitials}
           </span>
           <div className="min-w-0">
             <div className="text-[12.5px] font-medium text-[var(--ink)] truncate leading-[1.2]">
-              {CURRENT_USER.name}
+              {user?.username ?? '—'}
             </div>
             <div className="flex gap-1 items-center font-mono text-[9.5px] text-[var(--muted)] mt-[2px]">
               <span className="inline-block px-[5px] py-[1px] font-mono text-[9px] tracking-[0.1em] uppercase border rounded-[2px] leading-[1.2] text-[var(--accent)] border-[var(--accent)]">
-                {CURRENT_USER.role}
+                {roleLabel}
               </span>
             </div>
           </div>
@@ -192,6 +202,16 @@ export function Sidebar() {
                   onClick={() => {
                     window.open('https://github.com/LumenMarch/cs-monitor', '_blank')
                     setMenuOpen(false)
+                  }}
+                />
+                <UserAction
+                  icon={<LogOut size={14} />}
+                  label="Sign out"
+                  danger
+                  onClick={() => {
+                    logout()
+                    setMenuOpen(false)
+                    navigate('/login', { replace: true })
                   }}
                 />
               </div>

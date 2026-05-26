@@ -1,4 +1,6 @@
 import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { fetchDashboardSummary } from '@/api/endpoints'
 import { HeroBlock } from '@/components/dashboard/HeroBlock'
 import { KpiStrip } from '@/components/dashboard/KpiStrip'
 import { MoversSplit } from '@/components/dashboard/MoversTable'
@@ -10,7 +12,7 @@ import { LoadingDashboard } from '@/components/dashboard/LoadingDashboard'
 import { Card } from '@/components/ui/Card'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { useTweaks } from '@/stores/tweaks'
-import { ALERTS_TODAY, HERO_METRICS, WATCHLIST } from '@/data/mock'
+import { HERO_METRICS, WATCHLIST } from '@/data/mock'
 import { splitItemName } from '@/utils/format'
 
 /**
@@ -33,11 +35,27 @@ function DashboardContent() {
     return `${date} · ${time}`
   }, [])
 
-  // 涨/跌头部 - 标题文案数据
+  // 真后端 summary;Movers / Heatmap / AlertFeed 暂用 mock 占位(下轮接通)
+  const { data: summary } = useQuery({
+    queryKey: ['dashboard-summary'],
+    queryFn: fetchDashboardSummary,
+    staleTime: 60_000,
+  })
+
+  // 涨/跌头部 - 标题文案数据(mock,演示用)
   const gainers = [...WATCHLIST].sort((a, b) => b.change24 - a.change24)
   const losers = [...WATCHLIST].sort((a, b) => a.change24 - b.change24)
   const leadGain = splitItemName(gainers[0]!.name).finish
   const leadLoss = splitItemName(losers[0]!.name).finish
+
+  // KPI:有真数据用真数据
+  const todayAlerts = summary?.today_alert_count ?? 0
+  const yesterdayAlerts = summary?.yesterday_alert_count ?? 0
+  const alertDelta = todayAlerts - yesterdayAlerts
+  const collections = summary?.today_collection_count ?? 0
+  const apiQuotaPct = summary?.api_quota_percent ?? 0
+  const activeWatch = summary?.active_watchlist ?? 0
+  const extremeTracks = summary?.extreme_track_count ?? 0
 
   return (
     <div className="px-[var(--pad-x)] pt-7 pb-24 min-w-0">
@@ -62,33 +80,38 @@ function DashboardContent() {
       {/* —— Hero —— */}
       <HeroBlock />
 
-      {/* —— KPI strip —— */}
+      {/* —— KPI strip(真后端数据) —— */}
       <KpiStrip
         items={[
           {
             label: "Today's Alerts",
-            value: ALERTS_TODAY.length + 6,
-            foot: <>▲ 6 vs. yesterday</>,
-            footTone: 'up',
+            value: todayAlerts,
+            foot:
+              alertDelta === 0 ? (
+                <>= vs. yesterday</>
+              ) : alertDelta > 0 ? (
+                <>▲ {alertDelta} vs. yesterday</>
+              ) : (
+                <>▼ {Math.abs(alertDelta)} vs. yesterday</>
+              ),
+            footTone: alertDelta > 0 ? 'up' : alertDelta < 0 ? 'down' : 'neutral',
           },
           {
-            label: '24h Collections',
-            value: 48,
-            foot: <>Avg 4.1s · 1 timeout</>,
+            label: 'Collections today',
+            value: collections,
+            foot: <>every {summary?.check_interval_minutes ?? 30} min</>,
           },
           {
-            label: 'Watchlist Volatility',
-            value: 2.8,
-            format: (v) => v.toFixed(1),
-            suffix: <span className="text-[20px] text-[var(--muted)]">σ</span>,
-            foot: <>▲ 0.4 vs. 7d avg</>,
-            footTone: 'up',
+            label: 'Active watchlist',
+            value: activeWatch,
+            foot: <>{extremeTracks} extreme · monitoring</>,
           },
           {
             label: 'API Quota',
-            value: 42,
+            value: apiQuotaPct,
+            format: (v) => v.toFixed(0),
             suffix: <span className="text-[20px] text-[var(--muted)]">%</span>,
-            foot: <>4,213 / 10,000 calls today</>,
+            foot: <>SteamDT daily</>,
           },
         ]}
       />
