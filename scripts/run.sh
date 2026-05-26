@@ -24,7 +24,7 @@ warn() { echo -e "${YELLOW}! $*${NC}"; }
 
 # ---------- 工具链检查 ----------
 command -v uv  >/dev/null 2>&1 || err "uv 未安装：curl -LsSf https://astral.sh/uv/install.sh | sh"
-command -v bun >/dev/null 2>&1 || err "bun 未安装：curl -fsSL https://bun.sh/install | bash"
+command -v npm >/dev/null 2>&1 || err "npm 未安装（需要 Node.js 20+）"
 
 # ---------- .env 校验 ----------
 [ -f .env ] || err ".env 不存在，请先：cp .env.example .env 并填写必填项"
@@ -59,13 +59,13 @@ uv sync --quiet
 
 # ---------- 前端依赖 ----------
 if [ ! -d frontend/node_modules ]; then
-    info "安装前端依赖（bun install）"
-    (cd frontend && bun install)
+    info "安装前端依赖（npm install）"
+    (cd frontend && npm install)
 fi
 
 # ---------- 前端构建 ----------
-info "构建前端到 frontend/dist（bun run build）"
-(cd frontend && bun run build > /dev/null)
+info "构建前端到 frontend/dist（npm run build）"
+(cd frontend && npm run build > /dev/null)
 
 # ---------- 启动后端 ----------
 PORT=$(read_env WEB_PORT); PORT="${PORT:-8080}"

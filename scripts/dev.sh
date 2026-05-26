@@ -28,7 +28,7 @@ warn() { echo -e "${YELLOW}! $*${NC}"; }
 
 # ---------- 工具链 ----------
 command -v uv  >/dev/null 2>&1 || err "uv 未安装"
-command -v bun >/dev/null 2>&1 || err "bun 未安装"
+command -v npm >/dev/null 2>&1 || err "npm 未安装"
 
 # ---------- .env 校验 ----------
 [ -f .env ] || err ".env 不存在，请先：cp .env.example .env 并填写必填项"
@@ -56,8 +56,8 @@ info "同步 Python 依赖（uv sync）"
 uv sync --quiet
 
 if [ ! -d frontend/node_modules ]; then
-    info "安装前端依赖（bun install）"
-    (cd frontend && bun install)
+    info "安装前端依赖（npm install）"
+    (cd frontend && npm install)
 fi
 
 # ---------- 子进程管理 ----------
@@ -94,8 +94,8 @@ info "启动后端（uv run python main.py）"
 uv run python main.py &
 BACKEND_PID=$!
 
-info "启动前端 Vite dev（bun run dev）"
-(cd frontend && bun run dev) &
+info "启动前端 Vite dev（npm run dev）"
+(cd frontend && npm run dev) &
 FRONTEND_PID=$!
 
 echo "──────────────────────────────────────────"

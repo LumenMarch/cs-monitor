@@ -1,49 +1,21 @@
 import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import UnoCSS from 'unocss/vite'
-import compression from 'vite-plugin-compression'
-import { resolve } from 'path'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import path from 'node:path'
 
 export default defineConfig({
-  plugins: [
-    vue(),
-    UnoCSS(),
-    compression({
-      algorithm: 'gzip',
-      ext: '.gz',
-      threshold: 1024,
-      filter: /\.(js|css|html|svg)$/,
-    }),
-  ],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
+      '@': path.resolve(__dirname, './src'),
     },
   },
   server: {
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://127.0.0.1:8080',
         changeOrigin: true,
-      },
-      '/ws': {
-        target: 'ws://localhost:8080',
-        changeOrigin: true,
-        ws: true,
-      },
-    },
-  },
-  build: {
-    outDir: 'dist',
-    // 代码分割：路由级懒加载
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          echarts: ['echarts'],
-          'naive-ui': ['naive-ui'],
-          vendor: ['vue', 'vue-router', 'pinia', 'axios'],
-        },
       },
     },
   },
