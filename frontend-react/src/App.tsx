@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import Dashboard from '@/pages/Dashboard'
 import Watchlist from '@/pages/Watchlist'
+import ItemDetail from '@/pages/ItemDetail'
 import ComingSoon from '@/pages/ComingSoon'
 
 /**
@@ -15,15 +16,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/watchlist" element={<Watchlist />} />
-        <Route
-          path="/item/:id"
-          element={
-            <ComingSoon
-              title="Item Detail"
-              description="K 线 + MA5/MA20 + 成交量、5 平台比价、套利横幅、统计与告警历史 — 下一轮实现。"
-            />
-          }
-        />
+        <Route path="/item/:id" element={<ItemDetail />} />
         <Route
           path="/extreme"
           element={
