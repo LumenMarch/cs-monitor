@@ -10,6 +10,8 @@ import type {
   LoginRequest,
   LoginResponse,
   MeResponse,
+  NotifySettings,
+  NotifyTestRequest,
   PlatformPriceItem,
   SearchItem,
   SystemInfo,
@@ -191,4 +193,39 @@ export async function deleteExtremeTrack(
   await client.delete(
     `/extreme-track/${encodeURIComponent(marketHashName)}/${encodeURIComponent(platform)}`,
   )
+}
+
+/* —— Notify settings(admin only) —— */
+
+export async function fetchNotifySettings(): Promise<NotifySettings> {
+  const { data } = await client.get<NotifySettings>('/settings/notify')
+  return data
+}
+
+export async function updateNotifySettings(payload: NotifySettings): Promise<void> {
+  await client.put('/settings/notify', payload)
+}
+
+export async function testNotify(payload: NotifyTestRequest = {}): Promise<void> {
+  await client.post('/settings/notify/test', payload)
+}
+
+/* —— Database admin —— */
+
+export async function clearDatabase(): Promise<void> {
+  await client.post('/settings/db/clear', null, { params: { confirm: true } })
+}
+
+/** 通过 axios(带 token)下载数据库文件,触发浏览器 Save dialog */
+export async function downloadDatabase(): Promise<void> {
+  const resp = await client.get('/settings/db/export', { responseType: 'blob' })
+  const blob = resp.data as Blob
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'cs_monitor.db'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }

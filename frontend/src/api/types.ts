@@ -200,3 +200,18 @@ export interface ExtremeAlertListResponse {
   page: number
   limit: number
 }
+
+/* —— Notify —— */
+
+export interface NotifySettings {
+  notify_channel: string
+  wecom_webhook_url: string
+  telegram_bot_token: string
+  telegram_chat_id: string
+  serverchan_sendkey: string
+}
+
+export interface NotifyTestRequest {
+  channel?: string
+  extra?: Record<string, string>
+}
