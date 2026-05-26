@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/AppLayout'
 import Dashboard from '@/pages/Dashboard'
+import Watchlist from '@/pages/Watchlist'
 import ComingSoon from '@/pages/ComingSoon'
 
 /**
@@ -13,15 +14,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route
-          path="/watchlist"
-          element={
-            <ComingSoon
-              title="Watchlist"
-              description="表格 / 卡片双视图、分类筛选、批量操作条、行内迷你 K 线 — 下一轮实现。"
-            />
-          }
-        />
+        <Route path="/watchlist" element={<Watchlist />} />
         <Route
           path="/item/:id"
           element={
