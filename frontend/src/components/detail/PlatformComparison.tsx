@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { PLATFORM_PRICES, type PlatformPrice } from '@/data/mock'
+import type { PlatformPrice } from '@/data/types'
 import { formatCurrency } from '@/utils/format'
 import { cn } from '@/utils/cn'
 
@@ -14,11 +14,12 @@ interface Props {
  *  2. 渐变彩条价格轴 + 平台圆形 code 标记
  *  3. 每平台行带 bid/ask 范围条 + ↑now 标记 + vs floor 百分比
  *
- * 默认走 mock(无数据展示);传入 platforms 数组覆盖。
+ * 空 / 单平台时显示降级文案,不再回落 mock。
  */
-export function PlatformComparison({ platforms = PLATFORM_PRICES }: Props = {}) {
-  const list = platforms
-  const { min, max, range, cheapest, dearest, arbAbs, arbPct, sorted } = useMemo(() => {
+export function PlatformComparison({ platforms }: Props = {}) {
+  const list = platforms ?? []
+  const stats = useMemo(() => {
+    if (list.length < 2) return null
     const prices = list.map((p) => p.price)
     const mn = Math.min(...prices)
     const mx = Math.max(...prices)
@@ -36,6 +37,22 @@ export function PlatformComparison({ platforms = PLATFORM_PRICES }: Props = {}) 
       sorted: [...list].sort((a, b) => a.price - b.price),
     }
   }, [list])
+
+  if (stats === null) {
+    return (
+      <div className="px-[14px] py-6 bg-[var(--surface)] border border-[var(--hairline)] rounded-[3px] text-center">
+        <div className="font-mono text-[10.5px] tracking-[0.16em] uppercase text-[var(--muted)] mb-1">
+          cross-platform spread
+        </div>
+        <div className="text-[13px] text-[var(--muted)]">
+          {list.length === 0
+            ? '暂无平台价格数据'
+            : `只有 ${list[0]!.name} 一个平台报价,需 ≥ 2 个平台才能比价`}
+        </div>
+      </div>
+    )
+  }
+  const { min, max, range, cheapest, dearest, arbAbs, arbPct, sorted } = stats
 
   return (
     <div>

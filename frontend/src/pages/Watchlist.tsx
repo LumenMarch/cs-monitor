@@ -9,7 +9,7 @@ import {
   updateWatchlistItem,
 } from '@/api/endpoints'
 import { backendToWatchItem } from '@/api/adapters'
-import { type WatchItem } from '@/data/mock'
+import { type WatchItem } from '@/data/types'
 import { formatCurrency, formatDelta } from '@/utils/format'
 import { cn } from '@/utils/cn'
 import { Button } from '@/components/ui/Button'

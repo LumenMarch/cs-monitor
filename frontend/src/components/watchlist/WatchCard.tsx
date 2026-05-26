@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import type { WatchItem } from '@/data/mock'
+import type { WatchItem } from '@/data/types'
 import { ItemTile } from '@/components/ui/ItemTile'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { formatCurrency, formatDelta } from '@/utils/format'

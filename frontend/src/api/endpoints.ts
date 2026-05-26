@@ -2,6 +2,7 @@ import client from './client'
 import type {
   AlertRecord,
   AlertStatsResponse,
+  ArbitrageItem,
   ChangePasswordRequest,
   DashboardSummary,
   ExtremeAlertListResponse,
@@ -151,6 +152,13 @@ export async function searchItems(q: string, limit = 20): Promise<SearchItem[]> 
   const { data } = await client.get<SearchItem[]>('/prices/search', {
     params: { q, limit },
   })
+  return data
+}
+
+/* —— Arbitrage(跨平台价差) —— */
+
+export async function fetchArbitrage(): Promise<ArbitrageItem[]> {
+  const { data } = await client.get<ArbitrageItem[]>('/arbitrage')
   return data
 }
 

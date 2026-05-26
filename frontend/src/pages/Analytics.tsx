@@ -33,6 +33,14 @@ export default function Analytics() {
         </div>
       </div>
 
+      {/* mock-only 提示:只有 Cross-platform spread(SpreadTable)是真实数据 */}
+      <div className="mb-7 px-[14px] py-[10px] bg-[var(--surface)] border border-[var(--hairline)] rounded-[4px] font-mono text-[11px] text-[var(--muted)] leading-[1.55]">
+        当前 <span className="text-[var(--ink-2)]">Cross-platform spread</span> 已接 /arbitrage 真后端;
+        <span className="text-[var(--ink-2)]"> Volatility calendar</span> /
+        <span className="text-[var(--ink-2)]"> Category breakdown</span> /
+        <span className="text-[var(--ink-2)]"> Liquidity ranking</span> 仍为设计预览,后端尚未提供对应聚合接口。
+      </div>
+
       {/* —— Row 1:Calendar / Categories —— */}
       <section className="grid gap-7 mb-7" style={{ gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)' }}>
         <div>

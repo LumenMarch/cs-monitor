@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchWatchlist } from '@/api/endpoints'
 import { backendToWatchItem } from '@/api/adapters'
 import { Sparkline } from '@/components/ui/Sparkline'
-import type { WatchItem } from '@/data/mock'
+import type { WatchItem } from '@/data/types'
 import { formatCurrency, formatDelta } from '@/utils/format'
 import { cn } from '@/utils/cn'
 

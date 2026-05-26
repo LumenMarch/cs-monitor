@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { OHLC } from '@/data/mock'
+import type { OHLC } from '@/data/types'
 
 interface Props {
   ohlc: OHLC[]

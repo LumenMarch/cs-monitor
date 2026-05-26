@@ -1,17 +1,41 @@
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Bell, Search } from 'lucide-react'
-import { TICKER } from '@/data/mock'
+import { fetchWatchlist } from '@/api/endpoints'
+import { splitItemName } from '@/utils/format'
 
 interface Props {
   crumb: string
 }
 
 /**
- * 顶栏 · design.md §3 + §4
- * - sticky, border-bottom 1px hairline
- * - breadcrumb(Workspace / <crumb>)+ search + 通知 bell
- * - 下方贴 ticker(LIVE label + 滚动条)
+ * 顶栏 · sticky 顶 + breadcrumb + search + 通知 bell
+ * 下方贴 ticker:取 /watchlist 数据,展示前 N 项 latest_price + change_24h
+ * 不足两项时 ticker 显示占位文案
  */
 export function TopBar({ crumb }: Props) {
+  const query = useQuery({
+    queryKey: ['watchlist'],
+    queryFn: fetchWatchlist,
+    staleTime: 60_000,
+  })
+
+  const ticker = useMemo(() => {
+    return (query.data ?? [])
+      .filter((it) => it.latest_price != null)
+      .slice(0, 12)
+      .map((it) => {
+        const finish = splitItemName(it.display_name || it.market_hash_name).finish
+        const sym = (finish || it.market_hash_name).slice(0, 22)
+        return {
+          key: it.id,
+          sym,
+          px: it.latest_price ?? 0,
+          ch: it.change_24h ?? 0,
+        }
+      })
+  }, [query.data])
+
   return (
     <header className="sticky top-0 z-[50] border-b border-[var(--hairline)] bg-[var(--bg)]">
       <div className="flex items-center gap-[18px] px-[var(--pad-x)] py-[14px]">
@@ -50,24 +74,30 @@ export function TopBar({ crumb }: Props) {
         aria-label="Live price ticker"
       >
         <div className="flex-shrink-0 h-full px-[14px] flex items-center bg-[var(--ink)] text-[var(--bg)] tracking-[0.18em] text-[10px] font-semibold">
-          LIVE · {TICKER.length} items
+          LIVE · {ticker.length} items
         </div>
         <div className="flex-1 overflow-hidden whitespace-nowrap relative">
-          <div
-            className="inline-flex gap-[28px] pl-[18px] will-change-transform"
-            style={{ animation: 'ticker-scroll 90s linear infinite' }}
-          >
-            {[...TICKER, ...TICKER].map((t, i) => (
-              <div key={i} className="inline-flex items-center gap-2">
-                <span className="text-[var(--ink-2)]">{t.sym}</span>
-                <span className="text-[var(--ink)]">¥{t.px.toFixed(2)}</span>
-                <span className={t.ch >= 0 ? 'text-[var(--up)]' : 'text-[var(--down)]'}>
-                  {t.ch >= 0 ? '▲' : '▼'} {Math.abs(t.ch).toFixed(2)}%
-                </span>
-                <span className="text-[var(--muted-2)]">·</span>
-              </div>
-            ))}
-          </div>
+          {ticker.length < 2 ? (
+            <div className="px-[18px] text-[var(--muted)] tracking-[0.1em]">
+              add watchlist items to populate the ticker…
+            </div>
+          ) : (
+            <div
+              className="inline-flex gap-[28px] pl-[18px] will-change-transform"
+              style={{ animation: 'ticker-scroll 90s linear infinite' }}
+            >
+              {[...ticker, ...ticker].map((t, i) => (
+                <div key={`${t.key}-${i}`} className="inline-flex items-center gap-2">
+                  <span className="text-[var(--ink-2)]">{t.sym}</span>
+                  <span className="text-[var(--ink)]">¥{t.px.toFixed(2)}</span>
+                  <span className={t.ch >= 0 ? 'text-[var(--up)]' : 'text-[var(--down)]'}>
+                    {t.ch >= 0 ? '▲' : '▼'} {Math.abs(t.ch).toFixed(2)}%
+                  </span>
+                  <span className="text-[var(--muted-2)]">·</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </header>

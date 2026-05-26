@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { deleteWatchlistItem, updateWatchlistItem } from '@/api/endpoints'
-import type { WatchItem } from '@/data/mock'
+import type { WatchItem } from '@/data/types'
 import type { WatchlistItemWithPrice } from '@/api/types'
 import { formatCurrency } from '@/utils/format'
 

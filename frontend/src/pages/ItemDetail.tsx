@@ -10,7 +10,7 @@ import {
   fetchPlatformPrices,
   fetchWatchlist,
 } from '@/api/endpoints'
-import { DETAIL_OHLC, type Alert, type OHLC, type WatchItem } from '@/data/mock'
+import type { Alert, OHLC, WatchItem } from '@/data/types'
 import { formatCurrency, formatDelta, splitItemName } from '@/utils/format'
 import { cn } from '@/utils/cn'
 import { Button } from '@/components/ui/Button'
@@ -77,7 +77,7 @@ export default function ItemDetail() {
 
   const ohlc: OHLC[] = useMemo(() => {
     const data = klineQuery.data?.data
-    if (!data?.length) return DETAIL_OHLC // demo fallback
+    if (!data?.length) return []
     return data.map((d) => ({
       open: d.open,
       close: d.close,
@@ -86,6 +86,8 @@ export default function ItemDetail() {
       volume: d.volume ?? 0,
     }))
   }, [klineQuery.data])
+
+  const hasKline = ohlc.length > 0
 
   // —— 平台比价 ——
   const platformsQuery = useQuery({
@@ -111,26 +113,28 @@ export default function ItemDetail() {
     [alertsQuery.data],
   )
 
-  // —— Hero 数字按 K 线最新收盘价 ——
-  const last = ohlc[ohlc.length - 1]!
-  const first = ohlc[0]!
-  const change = ((last.close - first.close) / first.close) * 100
+  // —— Hero 数字优先用 K 线最新收盘价,无 K 线则回落 watchlist.latest_price ——
+  const last = hasKline ? ohlc[ohlc.length - 1]! : null
+  const first = hasKline ? ohlc[0]! : null
+  const heroPrice = last?.close ?? item.price
+  const change =
+    hasKline && first ? ((last!.close - first.close) / first.close) * 100 : 0
   const isUp = change >= 0
   const isUp24 = item.change24 >= 0
 
   const { weapon, finish } = splitItemName(item.name)
-  const intPart = Math.floor(last.close)
-  const fracPart = (last.close % 1) * 100
+  const intPart = Math.floor(heroPrice)
+  const fracPart = (heroPrice % 1) * 100
 
   const stats = useMemo(() => {
+    if (!hasKline) return { high: 0, low: 0, volSum: 0, volAvg: 0 }
     const high = Math.max(...ohlc.map((d) => d.high))
     const low = Math.min(...ohlc.map((d) => d.low))
     const volSum = ohlc.reduce((a, d) => a + d.volume, 0)
     const volAvg = Math.round(volSum / ohlc.length)
     return { high, low, volSum, volAvg }
-  }, [ohlc])
+  }, [ohlc, hasKline])
 
-  const usingDemoKline = !klineQuery.data?.data?.length
   const klineError = klineQuery.error
 
   return (
@@ -203,15 +207,25 @@ export default function ItemDetail() {
           </div>
 
           <div className="flex gap-[18px] items-center mt-1 flex-wrap">
-            <span
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-[3px] px-[9px] py-[5px] font-mono text-[12px] font-medium',
-                isUp ? 'text-[var(--up)] bg-[var(--up-bg)]' : 'text-[var(--down)] bg-[var(--down-bg)]',
-              )}
-            >
-              {isUp ? '▲' : '▼'} {formatCurrency(Math.abs(last.close - first.close))} ({formatDelta(change)})
-            </span>
-            <span className="font-mono text-[11px] text-[var(--muted)] tracking-[0.1em] uppercase">vs. 60d ago</span>
+            {hasKline && last && first ? (
+              <>
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-[3px] px-[9px] py-[5px] font-mono text-[12px] font-medium',
+                    isUp ? 'text-[var(--up)] bg-[var(--up-bg)]' : 'text-[var(--down)] bg-[var(--down-bg)]',
+                  )}
+                >
+                  {isUp ? '▲' : '▼'} {formatCurrency(Math.abs(last.close - first.close))} ({formatDelta(change)})
+                </span>
+                <span className="font-mono text-[11px] text-[var(--muted)] tracking-[0.1em] uppercase">
+                  vs. {range.toLowerCase()} ago
+                </span>
+              </>
+            ) : (
+              <span className="font-mono text-[11px] text-[var(--muted)] tracking-[0.1em] uppercase">
+                awaiting K-line history…
+              </span>
+            )}
             <span
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-[3px] px-[9px] py-[5px] font-mono text-[12px] font-medium',
@@ -249,12 +263,18 @@ export default function ItemDetail() {
               ))}
             </div>
           </div>
-          <KlineChart ohlc={ohlc} />
-          {usingDemoKline && (
-            <div className="font-mono text-[10.5px] tracking-[0.14em] uppercase text-[var(--muted-2)]">
-              {klineError
-                ? `K-line load failed (${apiErrorMessage(klineError)}) · showing demo`
-                : '— K-line · showing demo (no backend data)'}
+          {hasKline ? (
+            <KlineChart ohlc={ohlc} />
+          ) : (
+            <div
+              className="grid place-items-center font-mono text-[11px] text-[var(--muted)] border border-dashed border-[var(--hairline)] rounded-[3px]"
+              style={{ height: 220 }}
+            >
+              {klineQuery.isLoading
+                ? 'Loading K-line…'
+                : klineError
+                  ? `K-line load failed · ${apiErrorMessage(klineError)}`
+                  : 'No K-line data yet — backend hasn’t cached this period'}
             </div>
           )}
         </div>
@@ -268,7 +288,7 @@ export default function ItemDetail() {
             <>
               Platform comparison{' '}
               <span className="font-mono text-[10px] tracking-[0.2em] text-[var(--muted)] ml-2">
-                {platforms ? `${platforms.length} sources` : 'demo data'}
+                {platforms?.length ? `${platforms.length} sources` : 'no data yet'}
               </span>
             </>
           }
@@ -299,16 +319,27 @@ export default function ItemDetail() {
               className="grid gap-x-3 gap-y-1.5 text-[13px]"
               style={{ gridTemplateColumns: '1fr auto' }}
             >
-              <KvRow label="Open (60d ago)" value={formatCurrency(first.close)} />
-              <KvRow label="High" value={formatCurrency(stats.high)} />
-              <KvRow label="Low" value={formatCurrency(stats.low)} />
-              <KvRow label="Volume (Σ)" value={stats.volSum.toLocaleString()} />
-              <KvRow label="Avg daily volume" value={stats.volAvg.toLocaleString()} />
-              <KvRow label="Volatility (σ)" value="3.42%" />
-              <KvRow label="RSI-14" value="68.4" />
-              <KvRow label="MA-5 / MA-20" value="1814 / 1742" />
+              <KvRow
+                label={`Open (${range} ago)`}
+                value={first ? formatCurrency(first.close) : '—'}
+              />
+              <KvRow
+                label="High"
+                value={hasKline ? formatCurrency(stats.high) : '—'}
+              />
+              <KvRow
+                label="Low"
+                value={hasKline ? formatCurrency(stats.low) : '—'}
+              />
+              <KvRow
+                label="Volume (Σ)"
+                value={hasKline ? stats.volSum.toLocaleString() : '—'}
+              />
+              <KvRow
+                label="Avg daily volume"
+                value={hasKline ? stats.volAvg.toLocaleString() : '—'}
+              />
               <KvRow label="Alert threshold" value={`${item.threshold}%`} />
-              <KvRow label="Cooldown" value="4h" />
             </dl>
             <div className="mt-4 pt-3 border-t border-dashed border-[var(--hairline)]">
               <SignalsBlock />

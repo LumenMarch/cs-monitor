@@ -1,4 +1,4 @@
-import type { Alert, PlatformPrice, WatchItem, Wear, Category } from '@/data/mock'
+import type { Alert, PlatformPrice, WatchItem, Wear, Category } from '@/data/types'
 import type {
   AlertRecord,
   PlatformPriceItem,

@@ -238,3 +238,23 @@ export interface ChangePasswordRequest {
   current_password: string
   new_password: string
 }
+
+/* —— Arbitrage —— */
+
+export interface ArbitragePlatformPrice {
+  market_hash_name: string
+  platform: string
+  price: number
+  recorded_at: string
+}
+
+export interface ArbitrageItem {
+  market_hash_name: string
+  min_price: number
+  min_platform: string
+  max_price: number
+  max_platform: string
+  spread: number
+  spread_percent: number
+  platforms: ArbitragePlatformPrice[]
+}
