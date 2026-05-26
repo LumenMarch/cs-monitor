@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Columns3, MoreVertical, Plus, RefreshCcw } from 'lucide-react'
+import { Columns3, Plus, RefreshCcw } from 'lucide-react'
 import { apiErrorMessage } from '@/api/client'
 import {
   fetchWatchlist,
@@ -20,6 +20,7 @@ import { RangeSparkline } from '@/components/ui/RangeSparkline'
 import { Toggle } from '@/components/ui/Toggle'
 import { WearTag } from '@/components/ui/WearTag'
 import { AddItemDialog } from '@/components/watchlist/AddItemDialog'
+import { RowActionsMenu } from '@/components/watchlist/RowActionsMenu'
 import { BulkActionBar } from '@/components/watchlist/BulkActionBar'
 import {
   ColumnsPopover,
@@ -236,7 +237,11 @@ export default function Watchlist() {
 
       {/* —— Bulk —— */}
       {selected.size > 0 && (
-        <BulkActionBar items={selectedItems} onClear={() => setSelected(new Set())} />
+        <BulkActionBar
+          items={selectedItems}
+          backendItems={query.data ?? []}
+          onClear={() => setSelected(new Set())}
+        />
       )}
 
       {/* —— Loading / Empty —— */}
@@ -424,12 +429,19 @@ export default function Watchlist() {
                       style={{ height: 'var(--row-h)' }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <button
-                        className="w-7 h-7 inline-flex items-center justify-center rounded-[3px] text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--ink)]"
-                        aria-label="Row actions"
-                      >
-                        <MoreVertical size={14} />
-                      </button>
+                      {(() => {
+                        const backend = query.data?.find((b) => b.id === w.id)
+                        if (!backend) return null
+                        return (
+                          <RowActionsMenu
+                            marketHashName={backend.market_hash_name}
+                            itemName={w.name}
+                            threshold={w.threshold}
+                            monitoring={w.monitoring}
+                            onOpenDetail={() => navigate(`/item/${w.id}`)}
+                          />
+                        )
+                      })()}
                     </td>
                   </tr>
                 )
