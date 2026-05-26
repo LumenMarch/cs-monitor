@@ -1,10 +1,13 @@
 import client from './client'
 import type {
   AlertRecord,
+  AlertStatsResponse,
   DashboardSummary,
+  KlineResponse,
   LoginRequest,
   LoginResponse,
   MeResponse,
+  PlatformPriceItem,
   WatchlistItemCreate,
   WatchlistItemUpdate,
   WatchlistItemWithPrice,
@@ -74,5 +77,44 @@ export async function fetchAlerts(params: AlertsListParams = {}): Promise<{
   total: number
 }> {
   const { data } = await client.get('/alerts', { params })
+  return data
+}
+
+export interface AlertStatsParams {
+  start_date?: string
+  end_date?: string
+}
+
+export async function fetchAlertStats(params: AlertStatsParams = {}): Promise<AlertStatsResponse> {
+  const { data } = await client.get<AlertStatsResponse>('/alerts/stats', { params })
+  return data
+}
+
+/* —— K-line —— */
+
+export interface KlineParams {
+  /** SteamDT period:1=hour, 2=day, 3=week, 4=month */
+  period?: number
+  count?: number
+  platform?: string
+}
+
+export async function fetchKline(
+  marketHashName: string,
+  params: KlineParams = {},
+): Promise<KlineResponse> {
+  const { data } = await client.get<KlineResponse>(
+    `/kline/${encodeURIComponent(marketHashName)}`,
+    { params },
+  )
+  return data
+}
+
+/* —— Prices —— */
+
+export async function fetchPlatformPrices(marketHashName: string): Promise<PlatformPriceItem[]> {
+  const { data } = await client.get<PlatformPriceItem[]>(
+    `/prices/${encodeURIComponent(marketHashName)}/platforms`,
+  )
   return data
 }

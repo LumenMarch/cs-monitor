@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
-import { ALERTS_TODAY, WATCHLIST, type Alert } from '@/data/mock'
+import { apiErrorMessage } from '@/api/client'
+import { backendToAlert, mapAlertKind } from '@/api/adapters'
+import { fetchAlertStats, fetchAlerts, fetchWatchlist } from '@/api/endpoints'
+import { type Alert } from '@/data/mock'
 import { formatCurrency, formatDelta } from '@/utils/format'
 import { cn } from '@/utils/cn'
 import { Button } from '@/components/ui/Button'
@@ -15,22 +19,35 @@ import { KindBadge } from '@/components/alerts/KindBadge'
 
 type Kind = 'all' | 'surge' | 'drop' | 'qty'
 
-const TREND_DAYS: TrendDay[] = [
-  { d: 13, s: 2, dr: 1, q: 0 },
-  { d: 12, s: 3, dr: 1, q: 1 },
-  { d: 11, s: 2, dr: 2, q: 0 },
-  { d: 10, s: 5, dr: 2, q: 1 },
-  { d: 9, s: 3, dr: 2, q: 1 },
-  { d: 8, s: 7, dr: 3, q: 1 },
-  { d: 7, s: 5, dr: 3, q: 1 },
-  { d: 6, s: 9, dr: 4, q: 1 },
-  { d: 5, s: 8, dr: 3, q: 1 },
-  { d: 4, s: 5, dr: 2, q: 1 },
-  { d: 3, s: 4, dr: 1, q: 1 },
-  { d: 2, s: 6, dr: 2, q: 1 },
-  { d: 1, s: 7, dr: 3, q: 1 },
-  { d: 0, s: 8, dr: 4, q: 2 },
-]
+/**
+ * 由后端 by_day 统计构造 14 日 trend(缺失日补 0)
+ * 日期格式来自后端字符串(yyyy-mm-dd),按"今天距 D 天"反推索引。
+ */
+function buildTrendDays(byDay: { date: string; alert_type: string; count: number }[]): TrendDay[] {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const days: TrendDay[] = []
+  for (let d = 13; d >= 0; d--) {
+    const date = new Date(today)
+    date.setDate(date.getDate() - d)
+    const yyyy = date.getFullYear()
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    const key = `${yyyy}-${mm}-${dd}`
+    let s = 0
+    let dr = 0
+    let q = 0
+    for (const row of byDay) {
+      if (row.date !== key) continue
+      const kind = mapAlertKind(row.alert_type)
+      if (kind === 'surge') s += row.count
+      else if (kind === 'drop') dr += row.count
+      else q += row.count
+    }
+    days.push({ d, s, dr, q })
+  }
+  return days
+}
 
 /**
  * 告警日志 · design.md §4
@@ -40,19 +57,72 @@ export default function Alerts() {
   const navigate = useNavigate()
   const [type, setType] = useState<Kind>('all')
 
-  const filtered: Alert[] = useMemo(
-    () => (type === 'all' ? ALERTS_TODAY : ALERTS_TODAY.filter((a) => a.kind === type)),
-    [type],
+  const alertsQuery = useQuery({
+    queryKey: ['alerts', type],
+    queryFn: () => fetchAlerts({ page: 1, limit: 50, alert_type: undefined }),
+    staleTime: 30_000,
+  })
+
+  const statsQuery = useQuery({
+    queryKey: ['alerts-stats'],
+    queryFn: () => fetchAlertStats(),
+    staleTime: 60_000,
+  })
+
+  const watchlistQuery = useQuery({
+    queryKey: ['watchlist'],
+    queryFn: fetchWatchlist,
+    staleTime: 60_000,
+  })
+
+  const allAlerts: Alert[] = useMemo(
+    () => (alertsQuery.data?.items ?? []).map(backendToAlert),
+    [alertsQuery.data],
   )
+
+  const filtered: Alert[] = useMemo(
+    () => (type === 'all' ? allAlerts : allAlerts.filter((a) => a.kind === type)),
+    [allAlerts, type],
+  )
+
+  // KPI counts from by_type
+  const kpiCounts = useMemo(() => {
+    const counts = { surge: 0, drop: 0, qty: 0 }
+    const byType = statsQuery.data?.by_type ?? []
+    for (const row of byType) {
+      const k = mapAlertKind(row.alert_type)
+      counts[k] += row.count
+    }
+    return counts
+  }, [statsQuery.data])
+
+  const trendDays = useMemo(
+    () => buildTrendDays(statsQuery.data?.by_day ?? []),
+    [statsQuery.data],
+  )
+
+  // Top alerting items · 7 天内告警次数排名(取自当前 alerts 列表)
+  const topItems = useMemo(() => {
+    const counter = new Map<string, number>()
+    for (const a of allAlerts) {
+      counter.set(a.name, (counter.get(a.name) ?? 0) + 1)
+    }
+    return [...counter.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([name, count]) => ({ name, count }))
+  }, [allAlerts])
+
+  const totalToday = statsQuery.data?.total ?? alertsQuery.data?.total ?? 0
 
   const chips = useMemo<Chip<Kind>[]>(
     () => [
-      { value: 'all', label: `All · ${ALERTS_TODAY.length}` },
+      { value: 'all', label: `All · ${allAlerts.length}` },
       { value: 'surge', label: 'Surges' },
       { value: 'drop', label: 'Drops' },
       { value: 'qty', label: 'Quantity' },
     ],
-    [],
+    [allAlerts.length],
   )
 
   return (
@@ -67,48 +137,60 @@ export default function Alerts() {
             Alert journal
           </h1>
           <p className="text-[13px] text-[var(--muted)] mt-2 max-w-[56ch]">
-            {ALERTS_TODAY.length} alerts today · cooldown 4h per direction · normal monitor + extreme tracker
+            {totalToday} alerts in window · cooldown 4h per direction · normal monitor + extreme tracker
             combined
           </p>
         </div>
         <div className="flex gap-2 items-center">
           <Button>Export CSV</Button>
-          <Button>Date range · Last 7d</Button>
+          <Button>Date range · Last 14d</Button>
         </div>
       </div>
+
+      {/* —— 错误条 —— */}
+      {(alertsQuery.isError || statsQuery.isError) && (
+        <div className="mb-4 font-mono text-[11.5px] text-[var(--down)] bg-[var(--down-bg)] border border-[var(--down)]/20 rounded-[3px] px-3 py-2">
+          加载失败:{apiErrorMessage(alertsQuery.error ?? statsQuery.error)}
+        </div>
+      )}
 
       {/* —— Two cards row —— */}
       <section className="grid gap-7 mb-7" style={{ gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)' }}>
         <Card>
-          <AlertVolumeChart days={TREND_DAYS} />
+          <AlertVolumeChart days={trendDays} />
         </Card>
 
         <Card>
           {/* KPI 3-up */}
           <div className="grid gap-[18px]" style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' }}>
-            <KpiTile label="Surges" value={8} color="up" foot="+3 vs 7d avg" />
-            <KpiTile label="Drops" value={4} color="down" foot="−1 vs 7d avg" />
-            <KpiTile label="Quantity" value={2} color="accent" foot="tracker only" />
+            <KpiTile label="Surges" value={kpiCounts.surge} color="up" foot="price up · normal monitor" />
+            <KpiTile label="Drops" value={kpiCounts.drop} color="down" foot="price down · normal monitor" />
+            <KpiTile label="Quantity" value={kpiCounts.qty} color="accent" foot="extreme tracker only" />
           </div>
 
           {/* Top alerting items */}
           <div className="mt-[18px] pt-3.5 border-t border-[var(--hairline)]">
             <div className="font-mono text-[10px] tracking-[0.18em] uppercase text-[var(--muted)] mb-2">
-              Top alerting items · 7d
+              Top alerting items
             </div>
-            {WATCHLIST.slice(0, 4).map((w, i) => {
-              const count = 7 - i * 2
+            {topItems.length === 0 && (
+              <div className="font-mono text-[11px] text-[var(--muted-2)] py-2">
+                no alerts in current window
+              </div>
+            )}
+            {topItems.map(({ name, count }) => {
+              const max = topItems[0]?.count || 1
               return (
                 <div
-                  key={w.id}
+                  key={name}
                   className="grid items-center gap-2.5 py-1.5 text-[12.5px]"
                   style={{ gridTemplateColumns: 'minmax(0,1fr) 70px 28px' }}
                 >
-                  <span className="truncate">{w.name}</span>
+                  <span className="truncate">{name}</span>
                   <div className="h-1 bg-[var(--hairline)] rounded-full overflow-hidden relative">
                     <div
                       className="absolute inset-0 bg-[var(--accent)]"
-                      style={{ width: `${(count / 7) * 100}%` }}
+                      style={{ width: `${(count / max) * 100}%` }}
                     />
                   </div>
                   <span className="font-mono tnum text-[var(--muted)] text-right text-[11px]">{count}</span>
@@ -154,11 +236,13 @@ export default function Alerts() {
                 else p = direction * (1 + Math.sin((i - 6) * 1.2) * 0.06)
                 points.push(p)
               }
-              const item = WATCHLIST.find((w) => w.name === a.name)
+              const wlItem = watchlistQuery.data?.find(
+                (w) => w.market_hash_name.includes(a.name) || (w.display_name ?? '') === a.name,
+              )
               return (
                 <tr
                   key={a.id}
-                  onClick={() => item && navigate(`/item/${item.id}`)}
+                  onClick={() => wlItem && navigate(`/item/${wlItem.id}`)}
                   className="cursor-pointer transition-[background] duration-[120ms] hover:bg-[var(--surface)]"
                 >
                   <TD className="font-mono text-[var(--muted)]">{a.time}</TD>

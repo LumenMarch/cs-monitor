@@ -3,21 +3,28 @@ import { PLATFORM_PRICES, type PlatformPrice } from '@/data/mock'
 import { formatCurrency } from '@/utils/format'
 import { cn } from '@/utils/cn'
 
+interface Props {
+  platforms?: PlatformPrice[]
+}
+
 /**
  * 平台比价 · design.md(详情页 §4)
  * 三部分:
  *  1. Arbitrage 横幅(Buy at / +X% / Sell at)
  *  2. 渐变彩条价格轴 + 平台圆形 code 标记
  *  3. 每平台行带 bid/ask 范围条 + ↑now 标记 + vs floor 百分比
+ *
+ * 默认走 mock(无数据展示);传入 platforms 数组覆盖。
  */
-export function PlatformComparison() {
+export function PlatformComparison({ platforms = PLATFORM_PRICES }: Props = {}) {
+  const list = platforms
   const { min, max, range, cheapest, dearest, arbAbs, arbPct, sorted } = useMemo(() => {
-    const platforms = PLATFORM_PRICES
-    const mn = Math.min(...platforms.map((p) => p.price))
-    const mx = Math.max(...platforms.map((p) => p.price))
+    const prices = list.map((p) => p.price)
+    const mn = Math.min(...prices)
+    const mx = Math.max(...prices)
     const rg = mx - mn || 1
-    const ch = platforms.find((p) => p.price === mn)!
-    const de = platforms.find((p) => p.price === mx)!
+    const ch = list.find((p) => p.price === mn)!
+    const de = list.find((p) => p.price === mx)!
     return {
       min: mn,
       max: mx,
@@ -26,9 +33,9 @@ export function PlatformComparison() {
       dearest: de,
       arbAbs: mx - mn,
       arbPct: ((mx - mn) / mn) * 100,
-      sorted: [...platforms].sort((a, b) => a.price - b.price),
+      sorted: [...list].sort((a, b) => a.price - b.price),
     }
-  }, [])
+  }, [list])
 
   return (
     <div>
@@ -110,7 +117,7 @@ export function PlatformComparison() {
           ceiling · {formatCurrency(max)}
         </div>
         {/* Platform dots */}
-        {PLATFORM_PRICES.map((p) => {
+        {list.map((p) => {
           const pos = ((p.price - min) / range) * 100
           const isCheap = p.price === min
           const isDear = p.price === max

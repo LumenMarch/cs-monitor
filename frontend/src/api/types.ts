@@ -97,3 +97,37 @@ export interface AlertRecord {
   change_percent?: number
   notified_at: string
 }
+
+export interface AlertStatsItem {
+  date: string
+  alert_type: string
+  count: number
+}
+
+export interface AlertStatsResponse {
+  total: number
+  by_day: AlertStatsItem[]
+  by_type: AlertStatsItem[]
+}
+
+export interface KlineOhlc {
+  timestamp: number
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number | null
+}
+
+export interface KlineResponse {
+  market_hash_name: string
+  period: number
+  data: KlineOhlc[]
+}
+
+export interface PlatformPriceItem {
+  market_hash_name: string
+  platform: string
+  price: number
+  recorded_at: string
+}

@@ -1,7 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, BellRing, GitCompare, Star } from 'lucide-react'
-import { ALERTS_TODAY, DETAIL_OHLC, WATCHLIST, type WatchItem } from '@/data/mock'
+import { apiErrorMessage } from '@/api/client'
+import { backendToAlert, backendToPlatformPrices, backendToWatchItem } from '@/api/adapters'
+import {
+  fetchAlerts,
+  fetchKline,
+  fetchPlatformPrices,
+  fetchWatchlist,
+} from '@/api/endpoints'
+import { DETAIL_OHLC, type Alert, type OHLC, type WatchItem } from '@/data/mock'
 import { formatCurrency, formatDelta, splitItemName } from '@/utils/format'
 import { cn } from '@/utils/cn'
 import { Button } from '@/components/ui/Button'
@@ -16,6 +25,9 @@ import { SignalsBlock } from '@/components/detail/SignalsBlock'
 
 type Range = '7D' | '30D' | '60D' | '1Y'
 
+/** UI range → kline 接口 count 参数(后端固定 period=2=day) */
+const RANGE_COUNT: Record<Range, number> = { '7D': 7, '30D': 30, '60D': 60, '1Y': 365 }
+
 /**
  * Item Detail · design.md §3/§4
  * 返回 + breadcrumb · hero(价 + K-line)· 平台比价 · 统计 + Signals · 告警历史
@@ -25,12 +37,81 @@ export default function ItemDetail() {
   const { id } = useParams()
   const [range, setRange] = useState<Range>('60D')
 
-  const item: WatchItem =
-    WATCHLIST.find((w) => String(w.id) === id) ??
-    WATCHLIST.find((w) => w.name === 'Karambit | Midnight Vein') ??
-    WATCHLIST[0]!
+  // —— 通过 watchlist 把 id 解析回 market_hash_name + 基础元数据 ——
+  const watchlistQuery = useQuery({
+    queryKey: ['watchlist'],
+    queryFn: fetchWatchlist,
+    staleTime: 60_000,
+  })
+  const backendItem = watchlistQuery.data?.find((w) => String(w.id) === id)
+  const marketHashName = backendItem?.market_hash_name
 
-  const ohlc = DETAIL_OHLC
+  // 备用 fallback item(watchlist 还没拿到 / 跳错 id)
+  const fallbackItem: WatchItem = {
+    id: -1,
+    name: 'Loading…',
+    wear: 'FT',
+    category: 'Rifle',
+    price: 0,
+    change24: 0,
+    change7d: 0,
+    threshold: 5,
+    monitoring: true,
+    series: [],
+  }
+  const item: WatchItem = backendItem ? backendToWatchItem(backendItem) : fallbackItem
+
+  // —— K-line ——
+  const klineQuery = useQuery({
+    queryKey: ['kline', marketHashName, range],
+    queryFn: () =>
+      fetchKline(marketHashName!, {
+        period: 2,
+        count: RANGE_COUNT[range],
+        platform: 'ALL',
+      }),
+    enabled: !!marketHashName,
+    staleTime: 60_000,
+    retry: 1,
+  })
+
+  const ohlc: OHLC[] = useMemo(() => {
+    const data = klineQuery.data?.data
+    if (!data?.length) return DETAIL_OHLC // demo fallback
+    return data.map((d) => ({
+      open: d.open,
+      close: d.close,
+      high: d.high,
+      low: d.low,
+      volume: d.volume ?? 0,
+    }))
+  }, [klineQuery.data])
+
+  // —— 平台比价 ——
+  const platformsQuery = useQuery({
+    queryKey: ['platform-prices', marketHashName],
+    queryFn: () => fetchPlatformPrices(marketHashName!),
+    enabled: !!marketHashName,
+    staleTime: 60_000,
+  })
+  const platforms = useMemo(
+    () => (platformsQuery.data ? backendToPlatformPrices(platformsQuery.data) : undefined),
+    [platformsQuery.data],
+  )
+
+  // —— Alert history ——
+  const alertsQuery = useQuery({
+    queryKey: ['alerts', { mh: marketHashName }],
+    queryFn: () => fetchAlerts({ limit: 6, market_hash_name: marketHashName }),
+    enabled: !!marketHashName,
+    staleTime: 30_000,
+  })
+  const history: Alert[] = useMemo(
+    () => (alertsQuery.data?.items ?? []).map(backendToAlert),
+    [alertsQuery.data],
+  )
+
+  // —— Hero 数字按 K 线最新收盘价 ——
   const last = ohlc[ohlc.length - 1]!
   const first = ohlc[0]!
   const change = ((last.close - first.close) / first.close) * 100
@@ -49,7 +130,8 @@ export default function ItemDetail() {
     return { high, low, volSum, volAvg }
   }, [ohlc])
 
-  const history = ALERTS_TODAY.slice(0, 6)
+  const usingDemoKline = !klineQuery.data?.data?.length
+  const klineError = klineQuery.error
 
   return (
     <div className="px-[var(--pad-x)] pt-7 pb-24 min-w-0">
@@ -168,6 +250,13 @@ export default function ItemDetail() {
             </div>
           </div>
           <KlineChart ohlc={ohlc} />
+          {usingDemoKline && (
+            <div className="font-mono text-[10.5px] tracking-[0.14em] uppercase text-[var(--muted-2)]">
+              {klineError
+                ? `K-line load failed (${apiErrorMessage(klineError)}) · showing demo`
+                : '— K-line · showing demo (no backend data)'}
+            </div>
+          )}
         </div>
       </section>
 
@@ -179,14 +268,14 @@ export default function ItemDetail() {
             <>
               Platform comparison{' '}
               <span className="font-mono text-[10px] tracking-[0.2em] text-[var(--muted)] ml-2">
-                5 sources · spread {formatCurrency(306.6)} · arb +17.0%
+                {platforms ? `${platforms.length} sources` : 'demo data'}
               </span>
             </>
           }
-          meta="Updated 11s ago"
+          meta={platformsQuery.isLoading ? 'Loading…' : 'Updated just now'}
         />
         <Card className="!p-[22px]">
-          <PlatformComparison />
+          <PlatformComparison platforms={platforms} />
         </Card>
       </section>
 
