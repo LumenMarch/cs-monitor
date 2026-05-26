@@ -147,3 +147,56 @@ export interface SystemInfo {
   watchlist_count: number
   extreme_track_count: number
 }
+
+/* —— Extreme Track —— */
+
+export interface ExtremeTrackConfig {
+  id: number
+  market_hash_name: string
+  display_name?: string
+  platform: string
+  interval_seconds: number
+  enabled: number
+  price_track_enabled: number
+  price_change_mode: string
+  price_threshold_percent: number
+  quantity_track_enabled: number
+  quantity_change_mode: string
+  quantity_threshold_percent: number
+  alert_cooldown_seconds: number
+  quiet_hours_start?: string
+  quiet_hours_end?: string
+  icon_url?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ExtremeTrackSnapshot {
+  market_hash_name: string
+  platform: string
+  price: number | null
+  quantity: number | null
+  recorded_at: string
+}
+
+export interface ExtremeAlertRecord {
+  id: number
+  market_hash_name: string
+  display_name?: string
+  platform: string
+  alert_type: string
+  prev_price?: number
+  curr_price?: number
+  price_change_percent?: number
+  prev_quantity?: number
+  curr_quantity?: number
+  quantity_change_percent?: number
+  notified_at: string
+}
+
+export interface ExtremeAlertListResponse {
+  items: ExtremeAlertRecord[]
+  total: number
+  page: number
+  limit: number
+}

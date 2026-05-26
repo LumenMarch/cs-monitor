@@ -3,6 +3,9 @@ import type {
   AlertRecord,
   AlertStatsResponse,
   DashboardSummary,
+  ExtremeAlertListResponse,
+  ExtremeTrackConfig,
+  ExtremeTrackSnapshot,
   KlineResponse,
   LoginRequest,
   LoginResponse,
@@ -141,4 +144,51 @@ export async function searchItems(q: string, limit = 20): Promise<SearchItem[]> 
     params: { q, limit },
   })
   return data
+}
+
+/* —— Extreme Track —— */
+
+export async function fetchExtremeTracks(): Promise<ExtremeTrackConfig[]> {
+  const { data } = await client.get<ExtremeTrackConfig[]>('/extreme-track')
+  return data
+}
+
+export async function fetchExtremeSnapshots(): Promise<ExtremeTrackSnapshot[]> {
+  const { data } = await client.get<ExtremeTrackSnapshot[]>('/extreme-track/snapshots')
+  return data
+}
+
+export interface ExtremeAlertsParams {
+  page?: number
+  limit?: number
+  alert_type?: string
+  start_date?: string
+  end_date?: string
+  market_hash_name?: string
+}
+
+export async function fetchExtremeAlerts(
+  params: ExtremeAlertsParams = {},
+): Promise<ExtremeAlertListResponse> {
+  const { data } = await client.get<ExtremeAlertListResponse>('/extreme-track/alerts', { params })
+  return data
+}
+
+export async function toggleExtremeTrack(
+  marketHashName: string,
+  platform: string,
+): Promise<{ market_hash_name: string; platform: string; enabled: boolean }> {
+  const { data } = await client.post(
+    `/extreme-track/${encodeURIComponent(marketHashName)}/${encodeURIComponent(platform)}/toggle`,
+  )
+  return data
+}
+
+export async function deleteExtremeTrack(
+  marketHashName: string,
+  platform: string,
+): Promise<void> {
+  await client.delete(
+    `/extreme-track/${encodeURIComponent(marketHashName)}/${encodeURIComponent(platform)}`,
+  )
 }
