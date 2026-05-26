@@ -5,8 +5,11 @@ import { MoversSplit } from '@/components/dashboard/MoversTable'
 import { AlertFeed } from '@/components/dashboard/AlertFeed'
 import { VolatilityHeatmap } from '@/components/dashboard/VolatilityHeatmap'
 import { CollectionsFeed } from '@/components/dashboard/CollectionsFeed'
+import { EmptyDashboard } from '@/components/dashboard/EmptyDashboard'
+import { LoadingDashboard } from '@/components/dashboard/LoadingDashboard'
 import { Card } from '@/components/ui/Card'
 import { SectionHead } from '@/components/ui/SectionHead'
+import { useTweaks } from '@/stores/tweaks'
 import { ALERTS_TODAY, HERO_METRICS, WATCHLIST } from '@/data/mock'
 import { splitItemName } from '@/utils/format'
 
@@ -15,6 +18,14 @@ import { splitItemName } from '@/utils/format'
  * 实现 design.md §0–§7 全部 dashboard 区块
  */
 export default function Dashboard() {
+  const appState = useTweaks((s) => s.appState)
+  if (appState === 'empty') return <EmptyDashboard />
+  if (appState === 'loading') return <LoadingDashboard />
+
+  return <DashboardContent />
+}
+
+function DashboardContent() {
   const today = useMemo(() => {
     const d = new Date()
     const date = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })

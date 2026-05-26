@@ -1,5 +1,7 @@
 import { type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
+import { useTweaks } from '@/stores/tweaks'
+import { OfflineBanner } from './OfflineBanner'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 
@@ -30,13 +32,21 @@ function getCrumb(pathname: string): string {
 export function AppLayout({ children }: Props) {
   const location = useLocation()
   const crumb = getCrumb(location.pathname)
+  const appState = useTweaks((s) => s.appState)
+  const isOffline = appState === 'offline'
 
   return (
     <div className="grid min-h-screen" style={{ gridTemplateColumns: 'var(--sidebar-w) 1fr' }}>
       <Sidebar />
       <div className="flex flex-col min-w-0">
+        {isOffline && <OfflineBanner />}
         <TopBar crumb={crumb} />
-        <main className="flex-1 min-w-0">{children}</main>
+        <main
+          className="flex-1 min-w-0 transition-[filter,opacity] duration-[200ms]"
+          style={isOffline ? { filter: 'saturate(0.7)', opacity: 0.92 } : undefined}
+        >
+          {children}
+        </main>
       </div>
     </div>
   )
