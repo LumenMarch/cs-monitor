@@ -120,7 +120,7 @@ function DashboardContent() {
   const extremeTracks = summary?.extreme_track_count ?? 0
 
   return (
-    <div className="px-[var(--pad-x)] pt-7 pb-24 min-w-0">
+    <div className="px-[var(--pad-x)] pt-7 pb-24 min-w-0 page-anim">
       {/* —— Page head —— */}
       <div className="flex items-end justify-between gap-[18px] mb-[22px]">
         <div>

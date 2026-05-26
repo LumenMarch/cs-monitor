@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { fetchWatchlist } from '@/api/endpoints'
 import { backendToWatchItem } from '@/api/adapters'
+import { FlashOnChange } from '@/components/ui/FlashOnChange'
 import { Sparkline } from '@/components/ui/Sparkline'
 import type { WatchItem } from '@/data/types'
 import { formatCurrency, formatDelta } from '@/utils/format'
@@ -82,7 +83,9 @@ export function MoversList({ side, items }: Props) {
                   )}
                 </div>
                 <span className="font-mono text-[11.5px] tnum text-right text-[var(--ink)]">
-                  {item.price > 0 ? formatCurrency(item.price, false) : '—'}
+                  <FlashOnChange value={item.price}>
+                    {item.price > 0 ? formatCurrency(item.price, false) : '—'}
+                  </FlashOnChange>
                 </span>
                 <span
                   className={cn(
@@ -90,7 +93,9 @@ export function MoversList({ side, items }: Props) {
                     isUp ? 'text-[var(--up)]' : 'text-[var(--down)]',
                   )}
                 >
-                  {formatDelta(item.change24)}
+                  <FlashOnChange value={item.change24}>
+                    {formatDelta(item.change24)}
+                  </FlashOnChange>
                 </span>
               </button>
             )

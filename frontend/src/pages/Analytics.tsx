@@ -12,7 +12,7 @@ import { LiquidityRanking } from '@/components/analytics/LiquidityRanking'
  */
 export default function Analytics() {
   return (
-    <div className="px-[var(--pad-x)] pt-7 pb-24 min-w-0">
+    <div className="px-[var(--pad-x)] pt-7 pb-24 min-w-0 page-anim">
       {/* —— Page head —— */}
       <div className="flex items-end justify-between gap-[18px] mb-[22px]">
         <div>

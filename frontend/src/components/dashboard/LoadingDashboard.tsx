@@ -38,7 +38,7 @@ export function LoadingDashboard() {
   }
 
   return (
-    <div className="px-[var(--pad-x)] pt-7 pb-24 min-w-0">
+    <div className="px-[var(--pad-x)] pt-7 pb-24 min-w-0 page-anim">
       {/* Head */}
       <div className="flex items-end justify-between gap-[18px] mb-[22px]">
         <div>

@@ -35,7 +35,7 @@ const SUGGESTIONS = [
  */
 export function EmptyDashboard() {
   return (
-    <div className="px-[var(--pad-x)] pt-7 pb-24 min-w-0">
+    <div className="px-[var(--pad-x)] pt-7 pb-24 min-w-0 page-anim">
       <div className="flex items-end justify-between gap-[18px] mb-[22px]">
         <div>
           <div className="font-mono text-[10.5px] tracking-[0.22em] uppercase text-[var(--muted)] mb-2">

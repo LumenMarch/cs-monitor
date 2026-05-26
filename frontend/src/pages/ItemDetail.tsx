@@ -23,10 +23,10 @@ import { KlineChart } from '@/components/charts/KlineChart'
 import { PlatformComparison } from '@/components/detail/PlatformComparison'
 import { SignalsBlock } from '@/components/detail/SignalsBlock'
 
-type Range = '7D' | '30D' | '60D' | '1Y'
+type Range = '7D' | '30D' | '60D' | '90D' | '1Y'
 
 /** UI range → kline 接口 count 参数(后端固定 period=2=day) */
-const RANGE_COUNT: Record<Range, number> = { '7D': 7, '30D': 30, '60D': 60, '1Y': 365 }
+const RANGE_COUNT: Record<Range, number> = { '7D': 7, '30D': 30, '60D': 60, '90D': 90, '1Y': 365 }
 
 /**
  * Item Detail · design.md §3/§4
@@ -138,7 +138,7 @@ export default function ItemDetail() {
   const klineError = klineQuery.error
 
   return (
-    <div className="px-[var(--pad-x)] pt-7 pb-24 min-w-0">
+    <div className="px-[var(--pad-x)] pt-7 pb-24 min-w-0 page-anim">
       {/* —— Back + breadcrumb —— */}
       <div className="flex items-center gap-3 mb-[18px]">
         <Button variant="ghost" onClick={() => navigate(-1)}>
@@ -248,7 +248,7 @@ export default function ItemDetail() {
               K-line · {range} · daily candle
             </span>
             <div className="flex gap-1">
-              {(['7D', '30D', '60D', '1Y'] as const).map((r) => (
+              {(['7D', '30D', '60D', '90D', '1Y'] as const).map((r) => (
                 <button
                   key={r}
                   aria-pressed={range === r}
