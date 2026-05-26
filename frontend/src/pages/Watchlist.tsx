@@ -19,6 +19,7 @@ import { ItemTile } from '@/components/ui/ItemTile'
 import { RangeSparkline } from '@/components/ui/RangeSparkline'
 import { Toggle } from '@/components/ui/Toggle'
 import { WearTag } from '@/components/ui/WearTag'
+import { AddItemDialog } from '@/components/watchlist/AddItemDialog'
 import { BulkActionBar } from '@/components/watchlist/BulkActionBar'
 import {
   ColumnsPopover,
@@ -43,6 +44,7 @@ export default function Watchlist() {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [sort, setSort] = useState<SortState<SortKey>>({ key: 'change24', dir: 'desc' })
   const [colsOpen, setColsOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
   const [cols, setCols] = useState<ColumnMap>({
     price: true,
     change24: true,
@@ -212,12 +214,15 @@ export default function Watchlist() {
             <RefreshCcw size={13} className={refreshMut.isPending ? 'animate-spin' : ''} />
             {refreshMut.isPending ? 'Refreshing…' : 'Refresh'}
           </Button>
-          <Button variant="primary">
+          <Button variant="primary" onClick={() => setAddOpen(true)}>
             <Plus size={13} />
             Add item
           </Button>
         </div>
       </div>
+
+      {/* —— Add item dialog —— */}
+      <AddItemDialog open={addOpen} onOpenChange={setAddOpen} />
 
       {/* —— 错误条 —— */}
       {query.isError && (

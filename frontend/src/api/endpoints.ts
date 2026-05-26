@@ -8,6 +8,7 @@ import type {
   LoginResponse,
   MeResponse,
   PlatformPriceItem,
+  SearchItem,
   WatchlistItemCreate,
   WatchlistItemUpdate,
   WatchlistItemWithPrice,
@@ -116,5 +117,12 @@ export async function fetchPlatformPrices(marketHashName: string): Promise<Platf
   const { data } = await client.get<PlatformPriceItem[]>(
     `/prices/${encodeURIComponent(marketHashName)}/platforms`,
   )
+  return data
+}
+
+export async function searchItems(q: string, limit = 20): Promise<SearchItem[]> {
+  const { data } = await client.get<SearchItem[]>('/prices/search', {
+    params: { q, limit },
+  })
   return data
 }

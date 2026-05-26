@@ -131,3 +131,9 @@ export interface PlatformPriceItem {
   price: number
   recorded_at: string
 }
+
+export interface SearchItem {
+  market_hash_name: string
+  name?: string
+  icon_url?: string
+}
