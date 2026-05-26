@@ -4,6 +4,7 @@ import Dashboard from '@/pages/Dashboard'
 import Watchlist from '@/pages/Watchlist'
 import ItemDetail from '@/pages/ItemDetail'
 import Alerts from '@/pages/Alerts'
+import ExtremeTrack from '@/pages/ExtremeTrack'
 import ComingSoon from '@/pages/ComingSoon'
 
 /**
@@ -18,15 +19,7 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/watchlist" element={<Watchlist />} />
         <Route path="/item/:id" element={<ItemDetail />} />
-        <Route
-          path="/extreme"
-          element={
-            <ComingSoon
-              title="Extreme Track"
-              description="30 次轮询脉冲、倒计时进度、终端式 session log — 下一轮实现。"
-            />
-          }
-        />
+        <Route path="/extreme" element={<ExtremeTrack />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route
           path="/analytics"
