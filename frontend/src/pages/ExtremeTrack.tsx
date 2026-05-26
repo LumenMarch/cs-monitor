@@ -12,6 +12,7 @@ import { KpiStrip } from '@/components/dashboard/KpiStrip'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { TrackerCard } from '@/components/extreme/TrackerCard'
 import { SessionLog } from '@/components/extreme/SessionLog'
+import { AddTrackerDialog } from '@/components/extreme/AddTrackerDialog'
 import type { TrackEvent } from '@/components/extreme/types'
 
 /**
@@ -23,6 +24,7 @@ import type { TrackEvent } from '@/components/extreme/types'
  */
 export default function ExtremeTrack() {
   const [now, setNow] = useState(0)
+  const [addOpen, setAddOpen] = useState(false)
 
   // 每秒 tick 用于卡片倒计时
   useEffect(() => {
@@ -138,11 +140,12 @@ export default function ExtremeTrack() {
             <RefreshCw size={13} className={snapshotsQ.isFetching ? 'animate-spin' : ''} />
             Refresh
           </Button>
-          <Button variant="primary">
+          <Button variant="primary" onClick={() => setAddOpen(true)}>
             <Plus size={13} /> New tracker
           </Button>
         </div>
       </div>
+      <AddTrackerDialog open={addOpen} onOpenChange={setAddOpen} />
 
       {/* —— KPI strip —— */}
       <KpiStrip
@@ -192,7 +195,7 @@ export default function ExtremeTrack() {
             达到阈值即触发告警。
           </p>
           <div className="mt-4">
-            <Button variant="primary">
+            <Button variant="primary" onClick={() => setAddOpen(true)}>
               <Plus size={13} /> Configure first tracker
             </Button>
           </div>

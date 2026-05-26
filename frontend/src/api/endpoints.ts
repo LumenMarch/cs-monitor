@@ -5,6 +5,7 @@ import type {
   DashboardSummary,
   ExtremeAlertListResponse,
   ExtremeTrackConfig,
+  ExtremeTrackConfigCreate,
   ExtremeTrackSnapshot,
   KlineResponse,
   LoginRequest,
@@ -152,6 +153,13 @@ export async function searchItems(q: string, limit = 20): Promise<SearchItem[]> 
 
 export async function fetchExtremeTracks(): Promise<ExtremeTrackConfig[]> {
   const { data } = await client.get<ExtremeTrackConfig[]>('/extreme-track')
+  return data
+}
+
+export async function createExtremeTrack(
+  payload: ExtremeTrackConfigCreate,
+): Promise<ExtremeTrackConfig> {
+  const { data } = await client.post<ExtremeTrackConfig>('/extreme-track', payload)
   return data
 }
 

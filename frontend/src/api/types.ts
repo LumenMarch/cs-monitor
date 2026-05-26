@@ -201,6 +201,22 @@ export interface ExtremeAlertListResponse {
   limit: number
 }
 
+export interface ExtremeTrackConfigCreate {
+  market_hash_name: string
+  platform: string
+  interval_seconds?: number
+  enabled?: boolean
+  price_track_enabled?: boolean
+  price_change_mode?: 'any' | 'percent'
+  price_threshold_percent?: number
+  quantity_track_enabled?: boolean
+  quantity_change_mode?: 'any' | 'percent'
+  quantity_threshold_percent?: number
+  alert_cooldown_seconds?: number
+  quiet_hours_start?: string
+  quiet_hours_end?: string
+}
+
 /* —— Notify —— */
 
 export interface NotifySettings {
