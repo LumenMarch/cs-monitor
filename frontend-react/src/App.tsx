@@ -8,6 +8,7 @@ import Watchlist from '@/pages/Watchlist'
 import ItemDetail from '@/pages/ItemDetail'
 import Alerts from '@/pages/Alerts'
 import ExtremeTrack from '@/pages/ExtremeTrack'
+import Settings from '@/pages/Settings'
 import ComingSoon from '@/pages/ComingSoon'
 
 /**
@@ -45,15 +46,7 @@ export default function App() {
               />
             }
           />
-          <Route
-            path="/settings"
-            element={
-              <ComingSoon
-                title="Settings"
-                description="外观 / SteamDT API / 通知 / 监控 / 数据 / 关于 6 个 tab — 下一轮实现。"
-              />
-            }
-          />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AppLayout>
