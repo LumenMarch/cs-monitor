@@ -154,12 +154,33 @@ export function HeroBlock() {
           <span className="font-mono text-[10.5px] tracking-[0.14em] uppercase text-[var(--muted)]">
             Portfolio · 7d
           </span>
-          <span
-            className="font-mono text-[10.5px] tracking-[0.1em] px-2 py-1 rounded-[3px] bg-[var(--ink)] text-[var(--bg)]"
-            title="后端目前只支持 7 日 portfolio sparkline"
+          <div
+            className="inline-flex border border-[var(--hairline)] rounded-[3px] overflow-hidden"
+            role="group"
+            aria-label="Portfolio range"
           >
-            7D
-          </span>
+            {([
+              { id: '7D', enabled: true, hint: '' },
+              { id: '30D', enabled: false, hint: '30d portfolio history not yet available' },
+              { id: '90D', enabled: false, hint: '90d portfolio history not yet available' },
+            ] as const).map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                aria-pressed={r.id === '7D'}
+                disabled={!r.enabled}
+                title={r.hint || undefined}
+                className={cn(
+                  'font-mono text-[10.5px] tracking-[0.1em] px-[9px] py-[3px] transition-colors duration-[120ms]',
+                  r.id === '7D'
+                    ? 'bg-[var(--ink)] text-[var(--bg)]'
+                    : 'bg-transparent text-[var(--muted-2)] cursor-not-allowed',
+                )}
+              >
+                {r.id}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="relative">
           {series.length > 1 ? (

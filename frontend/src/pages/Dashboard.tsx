@@ -13,7 +13,7 @@ import { LoadingDashboard } from '@/components/dashboard/LoadingDashboard'
 import { Card } from '@/components/ui/Card'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { useTweaks } from '@/stores/tweaks'
-import { splitItemName } from '@/utils/format'
+import { formatDelta, splitItemName } from '@/utils/format'
 
 /**
  * Dashboard · CS Monitor Editorial Trading Terminal
@@ -56,19 +56,59 @@ function DashboardContent() {
     staleTime: 60_000,
   })
 
-  // 用真 watchlist 算 leader / dragger + 今日涨跌平衡
-  const { leadGain, leadLoss, upCount, downCount } = useMemo(() => {
-    const items = (watchlistQ.data ?? []).map(backendToWatchItem)
-    const sortedByChange = [...items].sort((a, b) => b.change24 - a.change24)
-    const gain = sortedByChange[0]
-    const loss = sortedByChange[sortedByChange.length - 1]
-    return {
-      leadGain: gain ? splitItemName(gain.name).finish || gain.name : null,
-      leadLoss: loss ? splitItemName(loss.name).finish || loss.name : null,
-      upCount: items.filter((i) => i.change24 > 0).length,
-      downCount: items.filter((i) => i.change24 < 0).length,
-    }
-  }, [watchlistQ.data])
+  // 用真 watchlist 算 leader / dragger + 今日涨跌平衡 + 7d portfolio % + watchlist σ%
+  const { leadGain, leadLoss, upCount, downCount, sevenDayPct, sevenDayHasData, volatility } =
+    useMemo(() => {
+      const raw = watchlistQ.data ?? []
+      const items = raw.map(backendToWatchItem)
+      const sortedByChange = [...items].sort((a, b) => b.change24 - a.change24)
+      const gain = sortedByChange[0]
+      const loss = sortedByChange[sortedByChange.length - 1]
+
+      // 7d portfolio %:把各 item sparkline 投影到等长后逐点相加,头尾比对
+      const sparks = raw.map((it) => it.sparkline ?? []).filter((s) => s.length > 0)
+      let pct = 0
+      let hasSeries = false
+      if (sparks.length > 0) {
+        const minLen = Math.min(...sparks.map((s) => s.length))
+        if (minLen >= 2) {
+          const series: number[] = []
+          for (let i = 0; i < minLen; i++) {
+            let sum = 0
+            for (const s of sparks) sum += s[s.length - minLen + i] ?? 0
+            series.push(sum)
+          }
+          const end = series[series.length - 1]!
+          const start = series[Math.max(0, series.length - 7)]!
+          if (start > 0) {
+            pct = ((end - start) / start) * 100
+            hasSeries = true
+          }
+        }
+      }
+
+      // Watchlist σ%:每个 item 计算 stddev / mean,再取平均 → 整组 7d 波动近似
+      const sigmas: number[] = []
+      for (const s of sparks) {
+        if (s.length < 2) continue
+        const mean = s.reduce((a, b) => a + b, 0) / s.length
+        if (mean <= 0) continue
+        const variance = s.reduce((a, b) => a + (b - mean) ** 2, 0) / s.length
+        sigmas.push((Math.sqrt(variance) / mean) * 100)
+      }
+      const vol =
+        sigmas.length > 0 ? sigmas.reduce((a, b) => a + b, 0) / sigmas.length : 0
+
+      return {
+        leadGain: gain ? splitItemName(gain.name).finish || gain.name : null,
+        leadLoss: loss ? splitItemName(loss.name).finish || loss.name : null,
+        upCount: items.filter((i) => i.change24 > 0).length,
+        downCount: items.filter((i) => i.change24 < 0).length,
+        sevenDayPct: pct,
+        sevenDayHasData: hasSeries,
+        volatility: vol,
+      }
+    }, [watchlistQ.data])
 
   // KPI:真后端数据
   const todayAlerts = summary?.today_alert_count ?? 0
@@ -88,13 +128,30 @@ function DashboardContent() {
             {today} · {upCount} ↑ {downCount} ↓ today
           </div>
           <h1 className="font-serif font-normal text-[44px] leading-[1.05] tracking-[-0.015em] m-0">
-            {leadGain || leadLoss ? (
+            {sevenDayHasData ? (
+              <>
+                <em className="italic text-[var(--accent)]">
+                  {formatDelta(sevenDayPct, 1)}
+                </em>{' '}
+                this 7d —
+                <br />
+                {leadGain && (
+                  <>
+                    led by <em className="italic text-[var(--accent)]">{leadGain}</em>
+                  </>
+                )}
+                {leadGain && leadLoss && ', '}
+                {leadLoss && (
+                  <>
+                    dragged by <em className="italic text-[var(--accent)]">{leadLoss}</em>
+                  </>
+                )}
+                .
+              </>
+            ) : leadGain || leadLoss ? (
               <>
                 Watching{' '}
-                <em className="not-italic">
-                  <span className="italic text-[var(--accent)]">{activeWatch}</span>
-                </em>{' '}
-                items —
+                <em className="italic text-[var(--accent)]">{activeWatch}</em> items —
                 <br />
                 {leadGain && (
                   <>
@@ -145,9 +202,15 @@ function DashboardContent() {
             foot: <>every {summary?.check_interval_minutes ?? 30} min</>,
           },
           {
-            label: 'Active watchlist',
-            value: activeWatch,
-            foot: <>{extremeTracks} extreme · monitoring</>,
+            label: 'Watchlist Volatility',
+            value: volatility,
+            format: (v) => v.toFixed(1),
+            suffix: <span className="text-[20px] text-[var(--muted)] ml-0.5">σ%</span>,
+            foot: (
+              <>
+                across {activeWatch} items · {extremeTracks} extreme
+              </>
+            ),
           },
           {
             label: 'API Quota',
