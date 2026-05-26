@@ -1,0 +1,105 @@
+/* ========================================================================
+ * CS Monitor · Editorial Trading Terminal · Design Tokens v3.1
+ *
+ * 所有 token 走 CSS 变量,通过下列 modifier 切换:
+ *   [data-theme]      light(默认) / dark
+ *   [data-accent]     sienna(默认) / lime / cobalt / plum
+ *   [data-risefall]   cn(默认,红涨绿跌) / intl(绿涨红跌)
+ *   [data-density]    comfortable(默认) / compact
+ * ======================================================================== */
+
+:root {
+  /* —— Color · Light(默认) —— */
+  --bg: #f3efe7;
+  --paper: #f7f3eb;
+  --surface: #fbf8f1;
+  --surface-2: #ffffff;
+  --ink: #14140f;
+  --ink-2: #2c2a25;
+  --muted: #6e6a60;
+  --muted-2: #99948a;
+  --hairline: #e4dfd2;
+  --hairline-2: #d6d0c0;
+
+  /* —— Accent · sienna(默认) —— */
+  --accent: #c75a2a;
+  --accent-soft: #f3d9ca;
+
+  /* —— Rise / Fall · 中国惯例(红涨绿跌) —— */
+  --up: #b8331f;
+  --down: #1e6b4a;
+  --up-bg: rgba(184, 51, 31, 0.08);
+  --down-bg: rgba(30, 107, 74, 0.08);
+
+  /* —— Typography —— */
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  --font-serif: 'Instrument Serif', 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* —— Geometry · Density · Comfortable(默认) —— */
+  --row-h: 44px;
+  --pad-x: 28px;
+  --sidebar-w: 220px;
+  --topbar-h: 64px;
+  --ticker-h: 32px;
+
+  /* —— Shadow —— */
+  --shadow-popup: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 2px 8px rgba(20, 20, 15, 0.04);
+}
+
+/* ===== Dark theme ===== */
+[data-theme='dark'] {
+  --bg: #0b0b09;
+  --paper: #111110;
+  --surface: #161613;
+  --surface-2: #1c1c18;
+  --ink: #f6f2e7;
+  --ink-2: #d8d3c5;
+  --muted: #8b867a;
+  --muted-2: #5e5a51;
+  --hairline: #262522;
+  --hairline-2: #353330;
+  --accent-soft: rgba(199, 90, 42, 0.16);
+
+  --shadow-popup: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+/* ===== Accent variants ===== */
+[data-accent='lime'] {
+  --accent: #6f8d2e;
+  --accent-soft: #e2ead0;
+}
+[data-theme='dark'][data-accent='lime'] {
+  --accent-soft: rgba(111, 141, 46, 0.18);
+}
+[data-accent='cobalt'] {
+  --accent: #2c54b4;
+  --accent-soft: #d4dcef;
+}
+[data-theme='dark'][data-accent='cobalt'] {
+  --accent-soft: rgba(44, 84, 180, 0.18);
+}
+[data-accent='plum'] {
+  --accent: #7a3a72;
+  --accent-soft: #ead6e7;
+}
+[data-theme='dark'][data-accent='plum'] {
+  --accent-soft: rgba(122, 58, 114, 0.18);
+}
+
+/* ===== International rise/fall ===== */
+[data-risefall='intl'] {
+  --up: #1e6b4a;
+  --down: #b8331f;
+  --up-bg: rgba(30, 107, 74, 0.08);
+  --down-bg: rgba(184, 51, 31, 0.08);
+}
+
+/* ===== Density ===== */
+[data-density='compact'] {
+  --row-h: 36px;
+  --pad-x: 22px;
+}
